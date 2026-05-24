@@ -1,0 +1,214 @@
+---
+title: "Tracking EU Member States' Vetoes"
+subtitle: "Who and when blocks joint EU action"
+toc: true
+---
+
+```{r setup, include=FALSE}
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(ggplot2)
+  library(ggiraph)
+  library(here)
+})
+source(here::here("R", "theme.R"))
+source(here::here("R", "freshness.R"))
+source(here::here("R", "table.R"))
+register_ggiraph_defaults()
+
+# Load the manual data.
+veto_csv <- here::here("data-manual", "ms-vetoes.csv")
+veto_data <- read.csv(veto_csv, sep = ";", fileEncoding = "UTF-8-BOM") |>
+  # Drop columns that are all-empty (legacy CSV trailing-comma artefact).
+  select(where(~ !(all(is.na(.)) | all(. == "")))) |>
+  filter(as.Date(date_veto) > as.Date("2011-01-01")) |>
+  arrange(date_veto)
+
+# Add IDs (matches old Rmd structure).
+veto_data <- veto_data |>
+  mutate(id_veto = row_number(), .before = 1) |>
+  group_by(date_veto, issue, issue_country, source) |>
+  mutate(id_issue = cur_group_id(), .after = 1) |>
+  ungroup()
+
+# Freshness meta from CSV mtime, with row count filled in after filter.
+veto_meta <- manual_meta(
+  veto_csv,
+  source_label = "data-manual/ms-vetoes.csv (hand-curated)"
+)
+veto_meta$rows <- nrow(veto_data)
+
+# Inline-prose stats.
+start_date <- format(min(as.Date(veto_data$date_veto)), "%d %B %Y")
+n_vetoes   <- nrow(veto_data)
+n_states   <- length(unique(veto_data$ms_veto))
+n_issues   <- max(veto_data$id_issue)
+```
+
+This page tracks all publicly reported instances of European Union Member
+States vetoing joint action. A veto is understood as an instance of a
+Member State blocking, temporarily or permanently, common EU action by
+opposing a measure under a procedure requiring unanimous agreement of all
+Member States.^[I count every reported instance of a veto being used, even
+if the same or similar issue already attracted a veto in the past.]
+
+Since `r start_date`, there have been `r n_vetoes` vetoes by `r n_states`
+Member States across `r n_issues` issues.
+
+```{r freshness, results='asis', echo=FALSE}
+freshness_badge(veto_meta)
+```
+
+```{r vetoes-table, echo=FALSE}
+veto_data |>
+  arrange(desc(as.Date(date_veto))) |>
+  transmute(
+    Date    = as.Date(date_veto),
+    Vetoer  = ms_veto,
+    Issue   = issue,
+    Country = ifelse(issue_country == "", "—", issue_country),
+    Source  = sprintf('<a href="%s" target="_blank">link</a>', source)
+  ) |>
+  dt_mo(escape = FALSE)
+```
+
+# Vetoes by Member State
+
+Hungary has been reported to have vetoed EU action more than any other
+Member State in recent history. In contrast, quite a few Member States
+have not had a single veto attributed to them. However, by relying on
+reported vetoes only, this statistic likely underestimates the true
+prevalence of vetoes. Another source of underestimation are long-standing
+vetoes: certain issues might not even be put on the Council agenda — and
+are therefore less likely to be reported — when one or several countries
+had vetoed the policy in question in the past.^[An example here is the
+opening of accession negotiations between the EU and (North) Macedonia,
+which was blocked by Greece for over a decade until a dispute over the
+country's name was resolved.]
+
+```{r plot-by-ms, echo=FALSE, fig.height=4.5, fig.width=9}
+df_a <- veto_data |>
+  count(ms_veto) |>
+  mutate(fill_hex = unname(mo_palette$ms_flags[ms_veto]))
+
+p_a <- ggplot(df_a, aes(x = reorder(ms_veto, n), y = n,
+                        fill = fill_hex,
+                        tooltip = paste0(ms_veto, ": ", n, " vetoes"),
+                        data_id = ms_veto)) +
+  geom_col_interactive(show.legend = FALSE) +
+  scale_fill_identity() +
+  scale_y_continuous(n.breaks = 8, expand = c(0, 0.1)) +
+  labs(x = NULL, y = "Total number of vetoes",
+       title = "Number of vetoes by Member State") +
+  theme_mo() +
+  theme(panel.grid = element_blank(),
+        panel.grid.major.y = element_line(colour = "grey95"),
+        axis.text.x = element_text(face = "bold"))
+
+girafe(ggobj = p_a, width_svg = 9, height_svg = 4.5)
+```
+
+# Vetoes over time
+
+Reported vetoes have become more common over time.^[The date of the veto
+is an approximation of when the negotiation was taking place rather than
+when the veto was reported.] Some would argue this is a signal of
+increasing polarization in the Council of the EU. But changes to the EU's
+institutional system also play a role. Notably, the creation of the office
+of the High Representative for Foreign and Security Affairs by the Lisbon
+Treaty has generated more opportunities for Member States to veto joint
+EU statements on foreign policy issues.
+
+This is also a reminder that not all vetoes are the same — blocking a
+legislative measure such as the harmonization of minimum corporate tax is
+arguably much more consequential than the wording of a non-binding
+declaration.
+
+```{r plot-over-time, echo=FALSE, fig.height=6, fig.width=9}
+df_b <- veto_data |>
+  mutate(
+    hex_color = unname(mo_palette$ms_flags[ms_veto]),
+    tooltip   = paste0("By: ", ms_veto, "\n",
+                       "On: ", format(as.Date(date_veto), "%d %B %Y"), "\n",
+                       "Issue: ", issue)
+  )
+
+p_b <- ggplot(df_b, aes(x = as.Date(date_veto), y = id_veto)) +
+  geom_vline(xintercept = as.Date(c("2014-12-01", "2019-12-01", "2024-12-01")),
+             lty = 2, colour = "grey60") +
+  annotate("text", label = "Juncker", angle = 90, size = 3, colour = "grey50",
+           x = as.Date("2014-10-01"), y = -Inf, vjust = 0, hjust = 0) +
+  annotate("text", label = "von der Leyen I", angle = 90, size = 3, colour = "grey50",
+           x = as.Date("2019-10-01"), y = -Inf, vjust = 0, hjust = 0) +
+  annotate("text", label = "von der Leyen II", angle = 90, size = 3, colour = "grey50",
+           x = as.Date("2024-10-01"), y = -Inf, vjust = 0, hjust = 0) +
+  geom_point_interactive(aes(colour = hex_color,
+                             tooltip = tooltip,
+                             data_id = id_veto),
+                         alpha = 0.9) +
+  scale_color_identity() +
+  scale_x_date(date_breaks = "year", date_labels = "%Y") +
+  scale_y_continuous(breaks = seq(0, n_vetoes, by = 5)) +
+  theme_mo() +
+  theme(axis.text.y = element_text(size = 6)) +
+  labs(x = NULL, y = "Veto No",
+       title = "Vetoes over time",
+       caption = "Hover for more information about the veto")
+
+girafe(ggobj = p_b, width_svg = 9, height_svg = 6)
+```
+
+When trying to interpret these data, one should be wary of the
+possibility that differences over time and between Member States are to
+some extent driven by how vetoes are communicated and reported.
+
+Moreover, whether countries choose to exercise a veto power can also be a
+function of other Member States' intentions to do the same. If Member
+State A knows for certain that Member State B will veto a measure, it can
+reap the 'benefit' of the failed action without contributing to it
+(free-riding). The number of reported vetoes therefore understates the
+true level of disagreement among Member States.
+
+# Veto issues and third countries
+
+We can also categorize the vetoes by what substantive issue they
+concerned and — because vetoes are frequently about foreign affairs —
+the third country in question. Multiple vetoes have related to progress
+in negotiating the accession of a candidate country outside the EU. Not
+all vetoes are directly linked to a third country; this is especially
+true when it comes to internal policies such as taxation.
+
+```{r plot-issues, echo=FALSE, fig.height=5, fig.width=9}
+df_c <- veto_data |>
+  mutate(issue_country = ifelse(issue_country == "", "No third country", issue_country)) |>
+  count(issue, issue_country) |>
+  mutate(sum = sum(n), .by = issue) |>
+  mutate(
+    tooltip = ifelse(issue_country == "No third country",
+                     paste0(n, " vetoes concerning ", issue),
+                     paste0(n, " vetoes concerning ", issue, " and ", issue_country)),
+    id = seq_len(dplyr::n())
+  )
+
+p_c <- ggplot(df_c, aes(x = n, y = reorder(issue, sum))) +
+  geom_col_interactive(aes(fill = issue_country,
+                           tooltip = tooltip,
+                           data_id = id),
+                       show.legend = FALSE) +
+  ggiraph::scale_fill_brewer_interactive(palette = "Paired", type = "qual") +
+  scale_x_continuous(expand = c(0, 0.15)) +
+  theme_mo() +
+  theme(axis.text.y = element_text(hjust = 1)) +
+  labs(x = NULL, y = NULL,
+       title = "Veto issues and third countries",
+       subtitle = "Number of times a veto related to an issue",
+       caption = "Hover for information about the third country")
+
+girafe(ggobj = p_c, width_svg = 9, height_svg = 5)
+```
+
+# Cite
+
+Ovádek, M. *Tracking EU Member States' Vetoes*. Accessed
+`r format(Sys.Date(), "%d %B %Y")`. Available at
+<https://michalovadek.github.io/euverse/trackers/eu-vetoes.html>.

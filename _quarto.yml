@@ -20,6 +20,8 @@ website:
         menu:
           - href: trackers/eu-finance.qmd
             text: EU Finance
+          - href: trackers/eu-vetoes.qmd
+            text: EU Vetoes
 
 format:
   html:

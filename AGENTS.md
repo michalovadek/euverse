@@ -212,7 +212,7 @@ Therefore:
 
 | Old artifact (under `old/` or sibling repo)        | Original build     | New location              | Data path                    |
 |----------------------------------------------------|--------------------|---------------------------|------------------------------|
-| `old/tracker.qmd`                                  | Quarto + Action    | `trackers/eu-vetoes.qmd`  | `data-manual/ms-vetoes.csv` (already here) |
+| `old/tracker.qmd` ✅ ported 2026-05-24             | Quarto + Action    | `trackers/eu-vetoes.qmd`  | `data-manual/ms-vetoes.csv` (already here) |
 | `old/eucourtstats.Rmd`                             | Rmd + nightly cron | `trackers/eu-court.qmd`   | `data-apis/eurlex_*`         |
 | `old/eulawstats.Rmd`                               | Rmd + nightly cron | `trackers/eu-law.qmd`     | `data-apis/eurlex_*`         |
 | `old/eufinancestats.Rmd` ✅ ported 2026-05-24      | Rmd + nightly cron | `trackers/eu-finance.qmd` | `data-apis/ecb_*, eurostat_*`|

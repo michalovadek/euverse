@@ -76,3 +76,23 @@ freshness_badge_combined <- function(metas) {
   )
   freshness_badge(oldest_meta)
 }
+
+manual_meta <- function(path, source_label = basename(path)) {
+  # Build a freshness-badge-shaped meta from a hand-curated file's mtime.
+  # Pages that consume manual data use this in place of the
+  # read_with_freshness() contract (no fetcher exists for manual files).
+  # Caller fills in $rows after counting (since the file might be filtered
+  # before plotting).
+  if (!file.exists(path)) {
+    stop(sprintf("Manual data file not found: %s", path), call. = FALSE)
+  }
+  mtime <- file.info(path)$mtime
+  list(
+    source     = source_label,
+    fetched_at = format(mtime, "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
+    # rows is NULL by default so the badge renders "?" if the caller
+    # forgets to override after counting. Callers SHOULD override:
+    #   meta <- manual_meta(path); meta$rows <- nrow(filtered_df)
+    rows       = NULL
+  )
+}

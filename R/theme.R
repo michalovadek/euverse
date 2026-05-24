@@ -11,7 +11,24 @@ mo_palette <- list(
   # Sequential and diverging are functions of n so callers can request the
   # exact length they need (rather than slicing a fixed vector).
   sequential = function(n) viridis::viridis(n),
-  diverging  = RColorBrewer::brewer.pal(11, "BrBG")
+  diverging  = RColorBrewer::brewer.pal(11, "BrBG"),
+  # EU Member State flag colours, keyed by ISO-2 country code. Used for
+  # country-coloured plots where cardinality (28+ states) exceeds the
+  # categorical palette. Lifted from the standalone eu-veto-tracker's
+  # hand-picked vector with one collision resolved (HU was #DC143C, the
+  # same as PL — HU is now a distinguishable green #436F4D drawn from the
+  # Hungarian flag's middle stripe). EA is a neutral grey for aggregate
+  # reference lines.
+  ms_flags = c(
+    AT = "#ED2939", BE = "#FAE042", BG = "#00966E", HR = "#FF0000",
+    CY = "#DFAF2C", CZ = "#11457E", DK = "#D1001F", EE = "#0072CE",
+    FI = "#003580", FR = "#0055A4", DE = "#FFCE00", GR = "#0D5EAF",
+    HU = "#436F4D", IE = "#169B62", IT = "#009246", LV = "#990000",
+    LT = "#FDB913", LU = "#00A1DE", MT = "#C8102E", NL = "#FF4F00",
+    PL = "#DC143C", PT = "#FF0000", RO = "#002B7F", SK = "#0B4EA2",
+    SI = "#009B77", ES = "#AA151B", SE = "#FECC00", GB = "#00247D",
+    EA = "#666666"
+  )
 )
 
 theme_mo <- function(base_size = 12) {

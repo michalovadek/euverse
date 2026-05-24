@@ -101,24 +101,14 @@ jobs:
           path: _site/
 
   # ----------------------------------------------------------------------------
-  # DEPLOY — currently INERT (`if: false`).
-  #
-  # Cut-over checklist before flipping `if: false` to `if: true`:
-  #   1. GitHub repo Settings → Pages → Source → "GitHub Actions"
-  #      (currently set to "Deploy from a branch / main / root").
-  #   2. Rename `home.qmd` → `index.qmd` and delete the static
-  #      `index.html`, `publications.html`, `tools.html`, `style.css` from
-  #      the repo root in the same commit.
-  #   3. Verify the artifact from a recent `render` job looks right
-  #      (download from Actions UI).
-  #   4. Change `if: false` below to `if: true` (or remove the line).
-  #
-  # Until cut-over, the workflow validates that the render pipeline is healthy
-  # but does not change what's served at https://michalovadek.github.io.
+  # DEPLOY — active since 2026-05-24.
+  # Precondition (one-time owner action, already done): GitHub repo Settings →
+  # Pages → Source = "GitHub Actions" (NOT "Deploy from a branch"). Without
+  # that toggle, this job fails with "no Pages deployment configured".
+  # See docs/specs/2026-05-24-eu-vetoes-port-design.md §3.2.
   # ----------------------------------------------------------------------------
   deploy:
     needs: render
-    if: false
     runs-on: ubuntu-latest
     environment:
       name: github-pages
