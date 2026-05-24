@@ -16,6 +16,10 @@ website:
     left:
       - href: home.qmd
         text: Home
+      - text: Trackers
+        menu:
+          - href: trackers/eu-finance.qmd
+            text: EU Finance
 
 format:
   html:

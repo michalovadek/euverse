@@ -1,0 +1,202 @@
+---
+title: "Borrowing and Yields in the European Union"
+subtitle: "An automatically updated overview of the EU's finances"
+toc: true
+---
+
+```{r setup, include=FALSE}
+suppressPackageStartupMessages({
+  library(ggplot2)
+  library(ggiraph)
+  library(ggforce)
+  library(dplyr)
+  library(lubridate)
+  library(stringr)
+  library(here)
+})
+source(here::here("R", "theme.R"))
+source(here::here("R", "freshness.R"))
+register_ggiraph_defaults()
+
+# Load all four snapshots once at the top of the page.
+yc  <- read_with_freshness("ecb_yield_curve")
+eus <- read_with_freshness("eurostat_teimf050")
+mrr <- read_with_freshness("ecb_mrr")
+hic <- read_with_freshness("ecb_hicp")
+
+today_d <- Sys.Date()
+```
+
+The European Union is not only a single market but also an economic and
+monetary union. Most members share the euro, which entails a supranational
+monetary policy run by the European Central Bank (ECB) together with Euro
+Area central banks. This page provides an automatically updated overview of
+several indicators central to that policy, sourced from the
+[ECB Data Portal API](https://data.ecb.europa.eu/help/api/) and Eurostat.
+
+```{r freshness, results='asis', echo=FALSE}
+freshness_badge_combined(list(yc$meta, eus$meta, mrr$meta, hic$meta))
+```
+
+# Euro Area government bond yields
+
+Government borrowing is normally carried out through bond sales. Bonds entitle
+the buyer to an interest rate (coupon) and the return of the principal at
+maturity. Bonds trade on secondary markets and their yields fluctuate
+accordingly.
+
+```{r euro-area-yields, echo=FALSE, fig.height=4.5, fig.width=8.5}
+df_yc <- yc$data |>
+  mutate(
+    maturity_label = paste0(maturity_years, "-year maturity"),
+    maturity_label = factor(maturity_label,
+                            levels = c("1-year maturity",
+                                       "5-year maturity",
+                                       "10-year maturity"))
+  )
+
+p_yc <- ggplot(df_yc, aes(x = date, y = yield_pct,
+                          colour = maturity_label,
+                          tooltip = maturity_label,
+                          data_id = maturity_label)) +
+  geom_hline(yintercept = 0, colour = "grey80") +
+  geom_line_interactive(linewidth = 0.3, show.legend = FALSE) +
+  scale_y_continuous(labels = function(x) paste0(x, "%")) +
+  scale_colour_manual(values = mo_palette$categorical[1:3]) +
+  ggforce::facet_zoom(xy = between(date, today_d - 365, today_d),
+                      horizontal = FALSE, zoom.size = 0.5) +
+  labs(x = NULL, y = "Yield",
+       title = "Euro Area government bond yields",
+       subtitle = "Daily spot rates, triple-A issuers only") +
+  theme_mo()
+
+girafe(ggobj = p_yc, width_svg = 8.5, height_svg = 4.5)
+```
+
+Lending money for longer is normally associated with higher yields; when
+short-term yields overtake long-term yields, the yield curve has inverted,
+which has historically been predictive of recessions.
+
+# Government bond yields by country
+
+```{r country-yields-prep, include=FALSE}
+country_data <- eus$data |>
+  filter(!geo %in% c("EA", "EU27_2020"))
+
+# Latest observation per country, then rank for max/min prose.
+cur_latest <- country_data |>
+  arrange(desc(date)) |>
+  group_by(country_name) |>
+  slice(1) |>
+  ungroup()
+
+cur_max_yld <- cur_latest |> slice_max(yield_pct, n = 1)
+cur_min_yld <- cur_latest |> slice_min(yield_pct, n = 1)
+
+# Euro Area average (last 12 months) and non-euro EU-member average.
+ea_recent <- eus$data |>
+  filter(geo == "EA", date >= today_d - 365) |>
+  summarise(mean = round(mean(yield_pct, na.rm = TRUE), 2))
+
+non_euro_geos <- c("CZ", "PL", "HU", "RO", "BG", "SE", "DK")
+non_ea_recent <- country_data |>
+  filter(geo %in% non_euro_geos, date >= today_d - 365) |>
+  summarise(mean = round(mean(yield_pct, na.rm = TRUE), 2))
+```
+
+```{r country-yields-plot, echo=FALSE, fig.height=7, fig.width=9}
+ea_series <- eus$data |> filter(geo == "EA") |> select(-geo, -country_name)
+
+p_country <- ggplot(country_data,
+                    aes(x = date, y = yield_pct)) +
+  geom_line(data = ea_series, aes(x = date, y = yield_pct),
+            colour = mo_palette$categorical[5], linetype = 2) +
+  geom_line_interactive(colour = "grey55", linewidth = 0.3) +
+  geom_point_interactive(
+    aes(tooltip = paste0(country_name, ": ", round(yield_pct, 2), "% (",
+                         format(date, "%Y-%m"), ")"),
+        data_id  = paste0(geo, format(date, "-%Y-%m"))),
+    size = 0.45, colour = "grey35"
+  ) +
+  scale_y_continuous(labels = function(x) paste0(x, "%")) +
+  facet_wrap(~ country_name) +
+  labs(x = NULL, y = "Yield",
+       title = "Government bond yields in the EU",
+       subtitle = "10-year maturity, monthly data",
+       caption = "Dashed line: Euro Area average") +
+  theme_mo() +
+  theme(axis.text.x = element_text(size = 6),
+        strip.text  = element_text(hjust = 1))
+
+girafe(ggobj = p_country, width_svg = 9, height_svg = 7)
+```
+
+As most EU borrowing happens at the national level, yields vary
+systematically by country as well as over time. At the moment the highest
+yields are on bonds issued by **`r cur_max_yld$country_name`** at
+**`r round(cur_max_yld$yield_pct, 2)`%**; the lowest are on
+**`r cur_min_yld$country_name`** at **`r round(cur_min_yld$yield_pct, 2)`%**.
+Over the last twelve months, the Euro Area aggregate yield averaged
+**`r ea_recent$mean`%**, while EU members outside the euro averaged
+**`r non_ea_recent$mean`%**. The simplistic comparison is confounded by
+uneven group composition (macroeconomic stability, debt loads), but
+comparing matched pairs across the divide — e.g. Czechia vs. Slovakia, or
+Finland vs. Sweden — can be instructive.
+
+# Euro Area key interest rate and inflation
+
+The ECB's primary mandate is price stability, with a long-term inflation
+target of 2% year-on-year.
+
+```{r rates-and-inflation, echo=FALSE, fig.height=4.5, fig.width=8.5}
+# Join the two series on a daily-frequency axis (rates are event-driven,
+# inflation is monthly; carry both forward to make the step plot work).
+days <- data.frame(date = seq.Date(as.Date("1998-01-01"), today_d, by = "day"))
+
+mrr_daily <- days |>
+  left_join(mrr$data, by = "date") |>
+  arrange(date) |>
+  mutate(value = vctrs::vec_fill_missing(rate_pct, direction = "down")) |>
+  transmute(date, series = "ECB main refinancing rate", value)
+
+hic_daily <- days |>
+  left_join(hic$data, by = "date") |>
+  arrange(date) |>
+  mutate(value = vctrs::vec_fill_missing(yoy_pct, direction = "down")) |>
+  transmute(date, series = "HICP year-on-year inflation", value)
+
+rates_long <- bind_rows(mrr_daily, hic_daily) |> filter(!is.na(value))
+
+p_rates <- ggplot(rates_long,
+                  aes(x = date, y = value,
+                      colour = series,
+                      tooltip = series,
+                      data_id = series)) +
+  geom_hline(yintercept = 0, colour = "grey80") +
+  geom_hline(yintercept = 2, colour = "grey50", linetype = 2) +
+  geom_step_interactive(linewidth = 0.35, show.legend = FALSE) +
+  annotate("text", x = as.Date("1998-11-01"), y = 2.4,
+           label = "2% inflation target", size = 2.6, colour = "grey40") +
+  scale_y_continuous(labels = function(x) paste0(x, "%")) +
+  scale_colour_manual(values = mo_palette$categorical[c(2, 6)]) +
+  ggforce::facet_zoom(x = between(date, today_d - 365, today_d),
+                      horizontal = FALSE, zoom.size = 0.5) +
+  labs(x = NULL, y = "Rate",
+       title = "Key interest rate and inflation",
+       subtitle = "ECB main refinancing operations rate and Euro Area HICP year-on-year change") +
+  theme_mo()
+
+girafe(ggobj = p_rates, width_svg = 8.5, height_svg = 4.5)
+```
+
+In times of rising inflation, the ECB's main countervailing instrument is
+to raise key interest rates.
+
+# Sources
+
+- ECB Data Portal API — [yield curve spot rates](https://data.ecb.europa.eu/data/datasets/YC), [main refinancing rate](https://data.ecb.europa.eu/data/datasets/FM), [HICP year-on-year inflation](https://data.ecb.europa.eu/data/datasets/ICP).
+- Eurostat — long-term gov bond yields, monthly, by country: dataset code `teimf050`.
+
+# Cite
+
+Ovádek, M. *Borrowing and Yields in the European Union*. Accessed `r format(today_d, "%d %B %Y")`. Available at <https://michalovadek.github.io/euverse/trackers/eu-finance.html>.

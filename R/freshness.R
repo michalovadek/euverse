@@ -53,3 +53,26 @@ freshness_badge <- function(meta) {
     cls, fetched_label, source_label, rows_label
   ))
 }
+
+freshness_badge_combined <- function(metas) {
+  # Render one badge for a multi-source page based on the OLDEST fetched_at
+  # in the input list. Users see worst-case staleness rather than best-case
+  # — the honest answer when a page joins data from several sources.
+  fetched_times <- vapply(metas, function(m) {
+    t <- suppressWarnings(
+      as.POSIXct(m$fetched_at, tz = "UTC", format = "%Y-%m-%dT%H:%M:%SZ")
+    )
+    if (length(t) == 1L && !is.na(t)) as.numeric(t) else NA_real_
+  }, numeric(1))
+  if (all(is.na(fetched_times))) {
+    return(freshness_badge(list(
+      source = "(multiple)", fetched_at = NA, rows = NA
+    )))
+  }
+  oldest_idx <- which.min(fetched_times)
+  oldest_meta <- metas[[oldest_idx]]
+  oldest_meta$source <- paste0(
+    oldest_meta$source, " (oldest of ", length(metas), " sources)"
+  )
+  freshness_badge(oldest_meta)
+}
