@@ -53,11 +53,8 @@ Member States.^[I count every reported instance of a veto being used, even
 if the same or similar issue already attracted a veto in the past.]
 
 Since `r start_date`, there have been `r n_vetoes` vetoes by `r n_states`
-Member States across `r n_issues` issues.
-
-```{r freshness, results='asis', echo=FALSE}
-freshness_badge(veto_meta)
-```
+Member States across `r n_issues` issues. This page is updated whenever
+a new veto is reported.
 
 ```{r vetoes-table, echo=FALSE}
 veto_data |>
@@ -207,8 +204,13 @@ p_c <- ggplot(df_c, aes(x = n, y = reorder(issue, sum))) +
 girafe(ggobj = p_c, width_svg = 9, height_svg = 5)
 ```
 
-# Cite
+# About this page
 
-Ovádek, M. *Tracking EU Member States' Vetoes*. Accessed
+Source data: [`data-manual/ms-vetoes.csv`](https://github.com/michalovadek/euverse/blob/main/data-manual/ms-vetoes.csv)
+in the [euverse](https://github.com/michalovadek/euverse) repository,
+last refreshed on
+`r format(file.info(veto_csv)$mtime, "%d %B %Y")`.
+
+Cite as: Ovádek, M. *Tracking EU Member States' Vetoes*. Accessed
 `r format(Sys.Date(), "%d %B %Y")`. Available at
 <https://michalovadek.github.io/euverse/trackers/eu-vetoes.html>.

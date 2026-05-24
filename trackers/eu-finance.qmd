@@ -116,8 +116,9 @@ p_country <- ggplot(country_data,
     aes(tooltip = paste0(country_name, ": ", round(yield_pct, 2), "% (",
                          format(date, "%Y-%m"), ")"),
         data_id  = paste0(geo, format(date, "-%Y-%m"))),
-    size = 0.45, colour = "grey35"
+    size = 1.5, colour = "grey35"
   ) +
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
   scale_y_continuous(labels = function(x) paste0(x, "%")) +
   facet_wrap(~ country_name) +
   labs(x = NULL, y = "Yield",
