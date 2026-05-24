@@ -1,0 +1,25 @@
+/*-- scss:defaults --*/
+// Override bootswatch font with Inter.
+$font-family-sans-serif: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !default;
+$font-family-base: $font-family-sans-serif !default;
+$headings-font-weight: 700 !default;
+
+/*-- scss:rules --*/
+// Plot/table containers blend with page bg in both light and dark modes
+// (avoids a white rectangle on the dark theme around ggiraph SVGs).
+.cell-output-display > img,
+.cell-output-display > .girafe,
+.cell-output-display > .dataTables_wrapper {
+  background: transparent;
+}
+
+// Tighter navbar — Quarto's default has more vertical air than we need.
+.navbar {
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+
+// Make freshness callouts slightly less loud than Quarto's defaults.
+.callout.callout-tip       { border-left-color: #1a7f37 !important; background: #f0fdf4; }
+.callout.callout-warning   { border-left-color: #bf8700 !important; background: #fffaeb; }
+.callout.callout-important { border-left-color: #cf222e !important; background: #fef2f2; }

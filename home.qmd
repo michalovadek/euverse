@@ -1,0 +1,58 @@
+---
+title: "Michal Ovádek"
+---
+
+```{r setup, include=FALSE}
+suppressPackageStartupMessages({
+  library(ggplot2)
+  library(ggiraph)
+  library(here)
+})
+source(here::here("R", "theme.R"))
+source(here::here("R", "freshness.R"))
+source(here::here("R", "table.R"))
+register_ggiraph_defaults()
+```
+
+Quarto site under construction (see `AGENTS.md`). The static landing page
+at `index.html` is still the live site at https://michalovadek.github.io.
+
+This `home.qmd` exists as a plumbing test: it exercises every shared helper
+end-to-end so we catch wiring breakage in CI before any real tracker page
+depends on the same layers.
+
+## Freshness badge
+
+```{r freshness-demo, results='asis', echo=FALSE}
+fd <- read_with_freshness("stub")
+freshness_badge(fd$meta)
+```
+
+## ggplot + ggiraph
+
+```{r plot-demo, echo=FALSE, fig.height=3.2, fig.width=7}
+df <- data.frame(
+  category = factor(c("alpha","beta","gamma","delta"), levels = c("alpha","beta","gamma","delta")),
+  value    = c(12, 19, 7, 23)
+)
+p <- ggplot(df, aes(x = category, y = value, fill = category,
+                    tooltip = paste0(category, ": ", value),
+                    data_id = category)) +
+  geom_col_interactive() +
+  scale_fill_manual(values = mo_palette$categorical[1:4], guide = "none") +
+  labs(title = "Theme + ggiraph smoke test", x = NULL, y = "value") +
+  theme_mo()
+girafe(ggobj = p, width_svg = 7, height_svg = 3.2)
+```
+
+## DT table
+
+```{r table-demo, echo=FALSE}
+dt_mo(head(mtcars, 8))
+```
+
+## gt table
+
+```{r gt-demo, echo=FALSE}
+gt_mo(head(iris, 5))
+```

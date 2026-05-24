@@ -1,0 +1,4 @@
+# Disable the renv sandbox on Windows to skip the ~16s per-Rscript activation
+# tax. Sandbox is a defence against package leakage from the system library;
+# we're already inside renv so the risk is low and the time cost is real.
+RENV_CONFIG_SANDBOX_ENABLED = FALSE

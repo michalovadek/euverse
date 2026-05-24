@@ -1,0 +1,350 @@
+---
+title: "Borrowing and Yields in the European Union"
+subtitle: "An Automatically Updated Overview of the EU's Finances"
+author: Dr Michal Ovádek
+output: 
+  html_document:
+    df_print: paged
+    number_sections: true
+    toc: true
+    toc_float: true
+    theme: united
+    highlight: pygments
+---
+
+<style>
+body {
+text-align: justify}
+</style>
+
+<style type="text/css">
+  body{
+  font-size: 13pt;
+}
+</style>
+
+<style>
+.tocify-extend-page {
+  height: 30px !important;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      warning = FALSE,
+                      message = FALSE,
+                      error = FALSE,
+                      fig.width = 9,
+                      fig.height = 6)
+```
+
+
+```{r initialdata, include=FALSE}
+
+# packages
+library(ggplot2)
+library(ggforce)
+library(ggiraph)
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(stringr)
+library(forcats)
+library(rmarkdown)
+library(modelsummary)
+library(DT)
+library(lubridate)
+library(gdtools)
+library(gfonts)
+
+# seed
+set.seed(35239)
+
+# fonts
+gdtools::register_liberationsans()
+#addGFontHtmlDependency(family = "Open Sans")
+
+# current date
+date_now <- Sys.Date()
+date_now_f <- str_remove(format(date_now, "%d %B %Y"), "^0")
+day_now <- as.integer(str_sub(date_now, 9, 10))
+year_now <- as.integer(str_sub(date_now, 1, 4))
+
+# citation
+cit_page <- paste("Michal Ovádek, '",rmarkdown::metadata$title,"', available at https://michalovadek.github.io/eufinance/, accessed on ", date_now_f,
+                  sep = "")
+
+#### download data ####
+
+# ecb api url
+ecb_api <- "https://data-api.ecb.europa.eu/service/data/"
+
+# time period argument
+"startPeriod=2004-09-06&endPeriod=2023-12-31"
+
+# Euro area bond yields, spot rates
+yields_l <- list()
+
+# 1 year, 5 year, 10 year maturities
+for (Y in c(1, 5, 10)){
+  
+  # construct URL
+  url = str_c(
+  ecb_api,
+  "YC/B.U2.EUR.4F.G_N_A.SV_C_YM.SR_",
+  Y,
+  "Y?startPeriod=2004-09-06&",
+  "endPeriod=",
+  as.character(date_now),
+  "&format=csvdata")
+  
+  yields_l[[as.character(Y)]] <- read.csv(url)
+  
+}
+
+# consolidate euro area yields
+yields_euroarea <- bind_rows(yields_l) |> 
+  select(DATA_TYPE_FM, TIME_PERIOD, OBS_VALUE, TITLE) |> 
+  as_tibble()
+
+```
+
+<br>
+
+The European Union (EU) is not only a single market but also an economic and monetary union. Most EU members have a common currency -- the euro -- which entails a supranational monetary policy. The European Central Bank (ECB) manages the euro together with Euro Area central banks.
+
+This automatically updated document provides a real-time overview of several indicators that are central to economic and monetary policy in the EU. All data comes from the [ECB API](https://data.ecb.europa.eu/help/api/) and Eurostat. The document is current as of ```r date_now_f```.
+
+# Euro Area Government Bond Yields
+
+Government borrowing is normally carried out through bond sales. Bonds are financial instruments that entitle the buyer (investor) to an interest rate (coupon rate) and the return of the principal on expiry (maturity date) in exchange for lending the government money at the outset. Like other securities, bonds are traded on secondary markets and their value and yields are therefore subject to fluctuation.
+
+```{r euroareabondyields}
+# iplot
+iplot_yields_euro <- yields_euroarea |> 
+  mutate(tooltip = case_when(
+     DATA_TYPE_FM == "SR_1Y" ~ "1-year maturity",
+     DATA_TYPE_FM == "SR_5Y" ~ "5-year maturity",
+     DATA_TYPE_FM == "SR_10Y" ~ "10-year maturity",
+     T ~ NA_character_
+  )) |> 
+  ggplot(aes(x = as.Date(TIME_PERIOD), y = OBS_VALUE)) +
+  geom_hline(yintercept = 0, lty = 1, color = "grey83") +
+  geom_line_interactive(aes(color = DATA_TYPE_FM,
+                            tooltip = tooltip,
+                            data_id = DATA_TYPE_FM), 
+                        linewidth = 0.23,
+                        show.legend = FALSE) + 
+  scale_y_continuous(labels = function(x) paste0(x, "%")) +
+  scale_color_manual_interactive(values = c("#98EDDF","#2D5C54","#5AB8A8")) +
+  theme_minimal(base_family = "Liberation Sans") +
+  theme(panel.grid = element_line(color = "grey96", linewidth = 0.2),
+        strip.background = element_rect(fill = "grey95", color = "grey92"),
+        plot.title = element_text(face = "bold")) +
+  facet_zoom(xy = between(as.Date(TIME_PERIOD), date_now-365, date_now),
+             horizontal = FALSE,
+             zoom.size = 0.5) +
+  labs(x = NULL, y = "Yield",
+       title = "Euro Area Government Bond Yields",
+       subtitle = "Daily spot rates, triple A issuers only")
+
+# interactive
+girafe(ggobj = iplot_yields_euro,
+       dependencies = gdtools::liberationsansHtmlDependency(),
+       #fonts = list(sans = "Open Sans"),
+       #width_svg = 12,
+       #height_svg = 8,
+       options = list(opts_sizing(rescale = TRUE),
+                      opts_toolbar(saveaspng = FALSE),
+                      opts_tooltip(css = "background-color:gray;color:white;font-style:italic;padding:9px;border-radius:5px;font-size:15px;",
+                                   use_fill = TRUE),
+                      opts_hover_inv(css = "opacity:0.2;"),
+                      opts_hover(css = ""))
+)
+```
+
+Typically, lending money for longer periods of time is associated with higher interest rates. When shorter-term yields overtake longer-term yields, we speak of an inverted yield curve. Yield curve inversion is historically predictive of recessions.
+
+```{r eurostatbonds}
+
+# eurostat
+library(eurostat)
+
+# get long term bond yields
+gov_b10yields <- get_eurostat("teimf050")
+
+# prep data
+pdata_govb10y <- gov_b10yields |> 
+  filter(!geo %in% c("EA","EU27_2020")) |> 
+  left_join(bind_rows(eurostat::eu_countries, tibble(code = "UK", name = "UK")), 
+            by = c("geo"="code")) |> 
+  mutate(month = str_sub(as.character(TIME_PERIOD), 1, 7),
+         tooltip = str_c("Yield: ", values, " (", month, ")"),
+         id = str_c(geo, month))
+
+# current max and min
+cur_max_yld <- pdata_govb10y |> 
+  arrange(desc(TIME_PERIOD)) |> 
+  group_by(name) |> 
+  slice(1) |> 
+  ungroup() |> 
+  slice_max(values)
+
+cur_min_yld <- pdata_govb10y |> 
+  arrange(desc(TIME_PERIOD)) |> 
+  group_by(name) |> 
+  slice(1) |> 
+  ungroup() |> 
+  slice_min(values)
+
+# EA and non-EA average
+non_euro_ylds_avg <- pdata_govb10y |> 
+  filter(geo %in% c("CZ","PL","HU","RO","BG","SE","DK")) |> 
+  summarise(mean = round(mean(values), 2))
+
+euro_ylds_avg <- filter(gov_b10yields, geo == "EA") |> 
+  summarise(mean = round(mean(values), 2))
+
+# iplot
+iplot_govylds <- pdata_govb10y |> 
+  ggplot() +
+  geom_line(data = filter(gov_b10yields, geo == "EA") |> select(-geo),
+            aes(x = as.Date(TIME_PERIOD), y = values),
+            lty = 2,
+            color = "#284ec9") +
+  geom_line_interactive(aes(x = as.Date(TIME_PERIOD), y = values),
+                        color = "grey60",
+                        linewidth = 0.4) +
+  geom_point_interactive(aes(x = as.Date(TIME_PERIOD), y = values, 
+                             tooltip = tooltip, data_id = id), 
+                         size = 0.4,
+                         color = "grey40") +
+  scale_y_continuous(labels = function(x) paste0(x, "%")) +
+  scale_x_date(date_breaks = "month", labels = function(z) gsub("^0", "", strftime(z, "%m"))) +
+  facet_wrap(~name) +
+  theme_minimal(base_family = "Liberation Sans") +
+  theme(panel.grid = element_line(color = "grey96", linewidth = 0.2),
+        strip.background = element_blank(),
+        strip.text = element_text(hjust = 1, face = "bold"),
+        axis.text.x = element_text(size = 6),
+        plot.title = element_text(face = "bold")) +
+  labs(x = NULL, y = "Yield",
+       title = "Government Bond Yields in the EU and UK",
+       subtitle = "10-year maturity, monthly data",
+       caption = "Dashed line represents the Euro Area average")
+
+# interactive
+girafe(ggobj = iplot_govylds,
+       dependencies = gdtools::liberationsansHtmlDependency(),
+       #fonts = list(sans = "Open Sans"),
+       #width_svg = 12,
+       #height_svg = 8,
+       options = list(opts_sizing(rescale = TRUE),
+                      opts_toolbar(saveaspng = FALSE),
+                      opts_tooltip(css = "background-color:gray;color:white;font-style:italic;padding:9px;border-radius:5px;font-size:15px;",
+                                   use_fill = TRUE),
+                      opts_hover_inv(css = "opacity:0.2;"),
+                      opts_hover(css = ""))
+)
+
+```
+
+As most government borrowing in the EU takes place at the national level, bond yields vary not only over time but also systematically by country. At the moment, yields are highest on bonds issued by ```r cur_max_yld$name```. Last month they traded at a yield of ```r cur_max_yld$values```%. In contrast, ```r cur_min_yld$name```'s bonds had the lowest yield at ```r cur_min_yld$values```%.
+
+Bond yields are indicative of the cost of government borrowing and as such play a major role in debates about the benefits of adopting the euro as a currency. Over the last year, 10-year bonds in the Euro Area had an average yield of ```r euro_ylds_avg$mean```%, while EU members that do not use the euro averaged a yield of ```r non_euro_ylds_avg$mean```%. This simplistic comparison is confounded by the uneven composition of the two groups in terms of macroeconomic stability, but it can be instructive to compare relatively similar countries in different regions (e.g. Czechia and Slovakia or Finland and Sweden).
+
+# Euro Area Key Interest Rates
+
+The ECB's primary mandate is price stability. Its long-term inflation target is 2% (year-on-year).
+
+```{r eurokeyinterest}
+
+## key ECB interest rate
+# construct URL
+url = str_c(
+  ecb_api,
+  "FM/B.U2.EUR.4F.KR.MRR_FR.LEV",
+  "?startPeriod=1998-01-01&",
+  "endPeriod=",
+  as.character(date_now),
+  "&format=csvdata"
+)
+
+# main refinancing operations
+key_interest_rate <- read.csv(url) |> 
+  select(TIME_PERIOD, OBS_VALUE, TITLE)
+
+## inflation
+# construct URL
+url = str_c(
+  ecb_api,
+  "ICP/M.U2.N.000000.4.ANR",
+  "?startPeriod=1998-01-01&",
+  "endPeriod=",
+  as.character(date_now),
+  "&format=csvdata"
+)
+
+# year-on-year inflation 
+inflation_rate <- read.csv(url) |> 
+  select(TIME_PERIOD, OBS_VALUE, TITLE) |> 
+  mutate(date = as.character(lubridate::ym(TIME_PERIOD)))
+
+# days
+days <- seq.Date(from = as.Date("1998-01-01"), to = date_now, by = "day")
+
+# interest rate and inflation
+rates <- tibble(date = as.character(days)) |> 
+  left_join(inflation_rate |> select(-TITLE, -TIME_PERIOD)) |> 
+  fill(OBS_VALUE) |> 
+  rename(inflation = OBS_VALUE) |> 
+  left_join(key_interest_rate |> select(-TITLE), by = c("date" = "TIME_PERIOD")) |> 
+  fill(OBS_VALUE) |> 
+  rename(ecb_rate = OBS_VALUE)
+
+# iplot
+iplot_rates <- rates |> 
+  pivot_longer(cols = -date) |> 
+  drop_na() |> 
+  mutate(tooltip = ifelse(name == "inflation", "Harmonised index of consumer prices, year-on-year change", "Interest rate on main refinancing operations")) |> 
+  ggplot(aes(x = as.Date(date), y = value)) +
+  geom_hline(yintercept = 0, lty = 1, color = "grey83") +
+  geom_hline(yintercept = 2, lty = 2, color = "grey40") +
+  geom_step_interactive(aes(color = name, tooltip = tooltip, data_id = name),
+                        linewidth = 0.29,
+                        show.legend = FALSE) +
+  annotate(geom = "text", label = "2% inflation target", x = as.Date("1997-11-01"), y = 2.4, size = 2.1) +
+  #scale_x_date(date_breaks = "5 years", date_labels = "%Y") +
+  scale_y_continuous(labels = function(x) paste0(x, "%")) +
+  scale_color_manual_interactive(values = c("#CDC7FD", "#758055")) +
+  theme_minimal(base_family = "Liberation Sans") +
+  theme(panel.grid = element_line(color = "grey96", linewidth = 0.2),
+        strip.background = element_rect(fill = "grey95", color = "grey92"),
+        plot.title = element_text(face = "bold")) +
+  facet_zoom(x = between(as.Date(date), date_now-365, date_now),
+             horizontal = FALSE,
+             zoom.size = 0.5) +
+  labs(x = NULL, y = "Rate",
+       title = "Key Interest Rate and Inflation",
+       subtitle = "Main refinancing operations and index of consumer prices")
+
+girafe(ggobj = iplot_rates,
+       dependencies = gdtools::liberationsansHtmlDependency(),
+       #fonts = list(sans = "Open Sans"),
+       #width_svg = 12,
+       #height_svg = 8,
+       options = list(opts_sizing(rescale = TRUE),
+                      opts_toolbar(saveaspng = FALSE),
+                      opts_tooltip(css = "background-color:gray;color:white;font-style:italic;padding:9px;border-radius:5px;font-size:15px;",
+                                   use_fill = TRUE),
+                      opts_hover_inv(css = "opacity:0.1;"),
+                      opts_hover(css = ""))
+)
+
+```
+
+In times of rising inflation, the ECB's main countervailing instrument is increasing key interest rates.
+
+# Cite
+
+Cite this document as `r cit_page`.

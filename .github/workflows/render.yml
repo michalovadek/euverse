@@ -1,0 +1,129 @@
+name: Render and deploy
+
+# Triggers:
+#   - schedule: nightly at 03:17 UTC. Chosen to land AFTER Eurostat's typical
+#     daily refresh window (~02:00 UTC for most indicators) and well before the
+#     working day in Europe. NOT 23:59 UTC like the old standalone trackers
+#     used — that races with Eurostat updates and gives stale numbers.
+#   - push: re-render on layout / code / lockfile changes (docs-only paths
+#     skipped to save runner minutes).
+#   - workflow_dispatch: manual reruns from the Actions tab.
+"on":  # quoted so YAML 1.1 parsers (PyYAML default) read it as a string, not bool True
+  schedule:
+    - cron: '17 3 * * *'
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'LICENSE'
+      - '.gitignore'
+      - '.gitattributes'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Don't cancel an in-flight nightly render if a push lands; let it finish so the
+# uploaded artifact reflects a complete state.
+concurrency:
+  group: pages-render
+  cancel-in-progress: false
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: '4.4.3'
+          use-public-rspm: true
+
+      # Caches based on hash of renv.lock; runs renv::restore() automatically.
+      # When we add packages that need system libs (cairo, poppler, etc.),
+      # insert `r-lib/actions/setup-r-dependencies@v2` BEFORE this step so the
+      # system packages get installed from DESCRIPTION/renv.lock.
+      - name: Restore renv
+        uses: r-lib/actions/setup-renv@v2
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: '0.10.7'
+          enable-cache: true
+
+      - name: Sync Python environment
+        # --frozen requires uv.lock to exist (it does — committed).
+        # --no-install-project skips installing this repo as a Python package;
+        # we use uv purely as an env manager, not to ship a wheel.
+        run: uv sync --frozen --no-install-project
+
+      - name: Setup Quarto
+        uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: '1.7.17'
+
+      # Graceful degradation: each fetcher under R/fetch_*.R is run in
+      # isolation. A failure writes a GH Actions WARNING annotation but does
+      # NOT fail the workflow — the qmd pages must fall back to the previous
+      # snapshot under data-apis/ and display the "as of <date>" badge from
+      # the sidecar .meta.json. See AGENTS.md §4 and R/freshness.R.
+      - name: Fetch nightly data
+        shell: bash
+        run: |
+          shopt -s nullglob
+          any=false
+          for f in R/fetch_*.R; do
+            any=true
+            name=$(basename "$f")
+            echo "::group::$name"
+            if Rscript "$f"; then
+              echo "$name OK"
+            else
+              echo "::warning file=$f::Fetcher $name failed; page will fall back to last good snapshot"
+            fi
+            echo "::endgroup::"
+          done
+          $any || echo "No R/fetch_*.R scripts yet — skipping fetch stage."
+
+      - name: Render Quarto site
+        run: quarto render
+
+      - name: Upload _site as Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site/
+
+  # ----------------------------------------------------------------------------
+  # DEPLOY — currently INERT (`if: false`).
+  #
+  # Cut-over checklist before flipping `if: false` to `if: true`:
+  #   1. GitHub repo Settings → Pages → Source → "GitHub Actions"
+  #      (currently set to "Deploy from a branch / main / root").
+  #   2. Rename `home.qmd` → `index.qmd` and delete the static
+  #      `index.html`, `publications.html`, `tools.html`, `style.css` from
+  #      the repo root in the same commit.
+  #   3. Verify the artifact from a recent `render` job looks right
+  #      (download from Actions UI).
+  #   4. Change `if: false` below to `if: true` (or remove the line).
+  #
+  # Until cut-over, the workflow validates that the render pipeline is healthy
+  # but does not change what's served at https://michalovadek.github.io.
+  # ----------------------------------------------------------------------------
+  deploy:
+    needs: render
+    if: false
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,1076 @@
+---
+title: "Judicial Proceedings in the European Union"
+subtitle: "An Automatically Updated Overview of the EU's Judicial Activity"
+author: Dr Michal Ovádek
+output: 
+  html_document:
+    df_print: paged
+    number_sections: true
+    toc: true
+    toc_float: true
+    theme: sandstone
+    highlight: espresso
+---
+
+<style>
+body {
+text-align: justify}
+</style>
+
+<style type="text/css">
+  body{
+  font-size: 13pt;
+}
+</style>
+
+<style>
+.tocify-extend-page {
+  height: 30px !important;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      warning = FALSE,
+                      message = FALSE,
+                      error = FALSE,
+                      fig.width = 9,
+                      fig.height = 6)
+```
+
+
+```{r initialdata, include=FALSE}
+
+# packages
+library(eurlex)
+library(ggplot2)
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(stringr)
+library(forcats)
+library(rmarkdown)
+library(modelsummary)
+library(ggiraph)
+library(DT)
+library(lubridate)
+library(maps)
+library(gdtools)
+library(gfonts)
+
+# seed
+set.seed(35239)
+
+# fonts
+gdtools::register_liberationsans()
+# addGFontHtmlDependency(family = "Open Sans")
+
+# current date
+date_now <- Sys.Date()
+date_now_f <- str_remove(format(date_now, "%d %B %Y"), "^0")
+day_now <- as.integer(str_sub(date_now, 9, 10))
+year_now <- as.integer(str_sub(date_now, 1, 4))
+
+# citation
+cit_page <- paste("Michal Ovádek, '",rmarkdown::metadata$title,"', available at https://michalovadek.github.io/eucourt/, accessed on ", date_now_f,
+                  sep = "")
+
+# data on the EU
+# enlargement rounds
+enlargements <- dplyr::tibble(
+  year = c(1952,1973,1981,1986,1995,2004,2007,2013,2020),
+  n_ms = c(6,9,10,12,15,25,27,28,27),
+  ms_composition = c(
+    "Belgium~~~France~~~Germany~~~Italy~~~Luxembourg~~~Netherlands",
+    "Belgium~~~France~~~Germany~~~Italy~~~Luxembourg~~~Netherlands~~~Denmark~~~Ireland~~~United Kingdom",
+    "Belgium~~~France~~~Germany~~~Italy~~~Luxembourg~~~Netherlands~~~Denmark~~~Ireland~~~United Kingdom~~~Greece",
+    "Belgium~~~France~~~Germany~~~Italy~~~Luxembourg~~~Netherlands~~~Denmark~~~Ireland~~~United Kingdom~~~Greece~~~Portugal~~~Spain",
+    "Belgium~~~France~~~Germany~~~Italy~~~Luxembourg~~~Netherlands~~~Denmark~~~Ireland~~~United Kingdom~~~Greece~~~Portugal~~~Spain~~~Austria~~~Finland~~~Sweden",
+    "Belgium~~~France~~~Germany~~~Italy~~~Luxembourg~~~Netherlands~~~Denmark~~~Ireland~~~United Kingdom~~~Greece~~~Portugal~~~Spain~~~Austria~~~Finland~~~Sweden~~~Cyprus~~~Czechia~~~Estonia~~~Hungary~~~Latvia~~~Lithuania~~~Malta~~~Poland~~~Slovakia~~~Slovenia",
+    "Belgium~~~France~~~Germany~~~Italy~~~Luxembourg~~~Netherlands~~~Denmark~~~Ireland~~~United Kingdom~~~Greece~~~Portugal~~~Spain~~~Austria~~~Finland~~~Sweden~~~Cyprus~~~Czechia~~~Estonia~~~Hungary~~~Latvia~~~Lithuania~~~Malta~~~Poland~~~Slovakia~~~Slovenia~~~Bulgaria~~~Romania",
+    "Belgium~~~France~~~Germany~~~Italy~~~Luxembourg~~~Netherlands~~~Denmark~~~Ireland~~~United Kingdom~~~Greece~~~Portugal~~~Spain~~~Austria~~~Finland~~~Sweden~~~Cyprus~~~Czechia~~~Estonia~~~Hungary~~~Latvia~~~Lithuania~~~Malta~~~Poland~~~Slovakia~~~Slovenia~~~Bulgaria~~~Romania~~~Croatia",
+    "Belgium~~~France~~~Germany~~~Italy~~~Luxembourg~~~Netherlands~~~Denmark~~~Ireland~~~Greece~~~Portugal~~~Spain~~~Austria~~~Finland~~~Sweden~~~Cyprus~~~Czechia~~~Estonia~~~Hungary~~~Latvia~~~Lithuania~~~Malta~~~Poland~~~Slovakia~~~Slovenia~~~Bulgaria~~~Romania~~~Croatia"
+  )
+)
+
+# indicate EU membership
+accessions <- tibble(
+  country = c("Austria",
+              "Belgium",       
+              "Bulgaria",      
+              "Croatia",       
+              "Cyprus",        
+              "Czechia",       
+              "Denmark",       
+              "Estonia",       
+              "Finland",       
+              "France",        
+              "Germany",       
+              "Greece",        
+              "Hungary",       
+              "Ireland",       
+              "Italy",         
+              "Latvia",        
+              "Lithuania",     
+              "Luxembourg",    
+              "Malta",         
+              "Netherlands",   
+              "Poland",        
+              "Portugal",      
+              "Romania",       
+              "Slovakia",      
+              "Slovenia",      
+              "Spain",         
+              "Sweden",        
+              "United Kingdom"),
+  year = c(1995,
+           1958,
+           2007,
+           2013,
+           2004,
+           2004,
+           1973,
+           2004,
+           1995,
+           1958,
+           1958,
+           1981,
+           2004,
+           1973,
+           1958,
+           2004,
+           2004,
+           1958,
+           2004,
+           1958,
+           2004,
+           1986,
+           2007,
+           2004,
+           2004,
+           1986,
+           1995,
+           1973),
+  eumember = 1L
+)
+
+# create MS panel
+ms_years_panel <- dplyr::tibble(year = 1952:year_now) |> 
+  dplyr::left_join(enlargements) |> 
+  tidyr::fill(n_ms,ms_composition) |> 
+  dplyr::mutate(dplyr::across(.cols = c(year,n_ms),
+                              .fns = ~as.integer(.))) |> 
+  tidyr::separate_rows(ms_composition, sep = "~~~") |> 
+  dplyr::rename(country = ms_composition)
+
+# get curia list
+curia_list <- elx_curia_list("all", parse = TRUE)
+
+# some corrections
+curia_list <- curia_list |> 
+  mutate(see_case = case_when(
+    str_detect(see_case, "[C|T|F] [:digit:]+/[:digit:]+") ~ str_replace(see_case, "(?<=[C|T|F]) (?=[:digit:])", "-"),
+    T ~ see_case
+  )) |> 
+  mutate(case_id = str_replace(case_id, "(?<=[:digit:])-(?=[:digit:])", "/"))
+
+# code vars
+curia_list <- curia_list |> 
+  filter(nchar(case_id) > 3) |> 
+  mutate(court = case_when(
+    str_detect(case_id, "OPIN|C-|^[:digit:]|RULING") ~ "CJ",
+    str_detect(case_id, "T-") ~ "GC",
+    str_detect(case_id, "F-") ~ "CST",
+    T ~ NA_character_
+  )) |> 
+  mutate(see_case_court = case_when(
+    str_detect(see_case, "OPIN|C-|^[:digit:]|RULING") ~ "CJ",
+    str_detect(see_case, "T-") ~ "GC",
+    str_detect(see_case, "F-") ~ "CST",
+    T ~ NA_character_
+  )) |> 
+  mutate(appeal_court = case_when(
+    str_detect(appeal, "OPIN|C-|^[:digit:]|RULING") ~ "CJ",
+    str_detect(appeal, "T-") ~ "GC",
+    str_detect(appeal, "F-") ~ "CST",
+    T ~ NA_character_
+  )) |>
+  mutate(case_status = case_when(
+    str_detect(case_id, "OPIN|RULING") ~ "Opinion",
+    str_detect(case_info, "^Judge?ment") ~ "Judgment",
+    str_detect(case_info, "^Order") ~ "Order",
+    str_detect(case_info, "^Removed") ~ "Removal",
+    str_detect(case_info, "^Pending") & is.na(ecli) ~ "Pending",
+    str_detect(case_info, "^Seizure order") ~ "Seizure order",
+    str_detect(case_info, "^Decision") & str_detect(case_id, "RX") ~ "Re-examination",
+    str_detect(case_info, "^Third-party proce") ~ "Third-party proceedings",
+    !is.na(see_case) & court != see_case_court ~ "Transferred",
+    !is.na(see_case) & court == see_case_court ~ "Joined",
+    T ~ NA_character_
+  )) |> 
+  mutate(case_year = str_extract(case_id, "/[:digit:]{2}"),
+         case_year = str_remove(case_year, "/"),
+         case_year = case_when(
+           str_detect(case_year, "^0|^1|^2|^3") ~ as.integer(str_c("20", case_year)),
+           str_detect(case_year, "^5|^6|^7|^8|^9") ~ as.integer(str_c("19", case_year)),
+           T ~ NA_integer_
+         ),
+         case_number = as.integer(str_extract(case_id, "[:digit:]+(?=/)")),
+         decision_year = as.integer(str_extract(ecli, "[:digit:]{4}"))) |> 
+  mutate(decision_date = str_extract(case_info, "[:digit:]{1,2} (January|February|March|April|May|June|July|August|September|October|November|December) (19|20)[:digit:]{2}"))
+  #filter(is.na(ecli), is.na(see_case))
+  #filter(is.na(case_status)) |> View()
+  #count(case_status) |> arrange(-n)
+
+# for initial para
+n_cases <- curia_list |> 
+  filter(case_status != "Transferred") |> 
+  reframe(n = n_distinct(case_id))
+
+n_decisions <- curia_list |> 
+  #filter(!case_status %in% c("Transferred", "Joined", "Pending")) |> 
+  reframe(n = n_distinct(ecli))
+
+n_pending <- curia_list |> 
+  filter(case_status == "Pending") |> 
+  group_by(court) |> 
+  reframe(n = n_distinct(case_id))
+
+# n year court cases
+n_cases_year_court <- curia_list |> 
+  #filter(case_status != "Transferred") |> 
+  summarise(n = n_distinct(case_id), .by = c(court,case_year)) %>%
+  right_join(., expand(., court, case_year)) |> 
+  mutate(n = ifelse(is.na(n), 0L, n))
+```
+
+<br>
+
+The Court of Justice of the European Union (CJEU) is the principal judicial institution of the European Union (EU). It consists of two courts: the somewhat confusingly named, higher-instance Court of Justice (CJ) and the lower-instance General Court (GC). There used to be a third court, the Civil Service Tribunal (CST), which was abolished and whose jurisdiction was transferred to the GC.
+
+This automatically updated research document gives a real-time overview of the EU courts' output and engagement with national courts through the preliminary ruling procedure. It relies on data collected via the [eurlex](https://github.com/michalovadek/eurlex) package for R^[For more details see the [website](https://github.com/michalovadek/eurlex). More example use cases, as well as arguments for integrating open data APIs into research workflows, can be found in this [open-access paper](https://www.tandfonline.com/doi/full/10.1080/2474736X.2020.1870150).] Because neither [Eur-Lex](https://eur-lex.europa.eu/homepage.html) nor [Curia](https://curia.europa.eu/juris/) contains the complete record of all court proceedings and documents, the data presented below should be viewed as a reasonable approximation of the true state of the world.^[The [IUROPA](https://iuropa.pol.gu.se/) project is attempting to create more comprehensive datasets.]
+
+As of ```r date_now_f```, EU courts delivered a total of ```r n_decisions$n``` decisions in about ```r n_cases$n``` cases submitted to them since 1953. According to [public records](https://curia.europa.eu/en/content/juris/c2_juris.htm), ```r n_pending$n[n_pending$court=="CJ"]``` cases are currently pending before the Court of Justice and ```r n_pending$n[n_pending$court=="GC"]``` before the General Court. The following table shows the most recent cases received by the CJ:
+
+```{r mostrecenttable}
+curia_list |> 
+  filter(court == "CJ") |> 
+  arrange(-case_year, -case_number) |> 
+  select(case_id, case_info) |> 
+  slice(1:50) |> 
+  datatable()
+```
+
+# Number of cases {.tabset}
+
+Even more than any [other branch](https://michalovadek.github.io/eulaw/) of the EU, the CJEU's caseload changed dramatically over the course of European integration. In 1953 -- the first year of its functioning -- the CJ received ```r n_cases_year_court$n[n_cases_year_court$court=="CJ"&n_cases_year_court$case_year==1953]``` cases. Last year (```r year_now-1```), it received ```r n_cases_year_court$n[n_cases_year_court$court=="CJ"&n_cases_year_court$case_year==year_now-1]```, while the GC received ```r n_cases_year_court$n[n_cases_year_court$court=="GC"&n_cases_year_court$case_year==year_now-1]```.
+
+## Plot
+```{r ncasesyearcourt}
+# consistent palette for courts
+court_palette <-
+  tibble(court = fct_inorder(factor(c("CJ", "GC", "CST"))),
+         clx_court = fct_inorder(factor(c("C","T","F"))),
+         court_long = fct_inorder(factor(c("Court of Justice", "General Court", "Civil Service Tribunal"))),
+         color = fct_inorder(factor(c("#fd014d", "#122771", "#3dcbb8"))))
+
+# add labels
+n_cases_year_court_labs <- n_cases_year_court |> 
+  mutate(court_long = case_when(
+    court == "CJ" ~ "Court of Justice",
+    court == "GC" ~ "General Court",
+    court == "CST" ~ "Civil Service Tribunal",
+    T ~ NA_character_
+  )) |> 
+  mutate(court_long = fct_relevel(court_long, "Court of Justice", "General Court"),
+         tooltip = str_c("N = ", n, " (", case_year, ")"),
+         data_id = str_c(court, case_year)) |> 
+  left_join(court_palette)
+
+# plot
+iplot_cases_year_court <- n_cases_year_court_labs |> 
+  group_by(court) |> 
+  mutate(global_mean = mean(n)) |> 
+  ggplot(aes(x = case_year, y = n, fill = color)) +
+  geom_hline(aes(yintercept = global_mean, colour = color), lty = 2, alpha = 0.33) +
+  geom_col_interactive(color = "grey96",
+                       aes(tooltip = tooltip, data_id = data_id)) +
+  scale_fill_identity() +
+  scale_colour_identity() +
+  scale_x_continuous(breaks = seq(from = 1950, to = year_now+1, by = 10)) +
+  facet_wrap(~court_long, scales = "free_y", dir = "v") +
+  theme_minimal(base_family = "Liberation Sans") +
+  theme(panel.grid = element_blank(),
+        panel.grid.major.y = element_line(color = "grey94"),
+        panel.grid.major.x = element_line(color = "grey94"),
+        axis.text = element_text(color = "grey10"),
+        plot.background = element_rect(fill = "white", color = "grey88"),
+        title = element_text(face = "bold"),
+        plot.subtitle = element_text(face = "italic"),
+        plot.caption = element_text(face = "italic", size = 8),
+        strip.text = element_text(hjust = 1, face = "bold")) +
+  labs(x = NULL, y = NULL,
+       title = "Number of cases received by EU courts",
+       subtitle = "Aggregated by year and court",
+       caption = "Dashed line shows the mean")
+
+# interactive
+girafe(ggobj = iplot_cases_year_court,
+       dependencies = gdtools::liberationsansHtmlDependency(),
+       #fonts = list(sans = "Open Sans"),
+       #width_svg = 12,
+       #height_svg = 8,
+       options = list(opts_sizing(rescale = TRUE),
+                      opts_toolbar(saveaspng = FALSE),
+                      opts_tooltip(css = "background-color:gray;color:white;font-style:italic;padding:9px;border-radius:5px;font-size:15px;",
+                                   use_fill = TRUE),
+                      opts_hover_inv(css = "opacity:0.1;"),
+                      opts_hover(css = "fill:gray;stroke:black;"))
+)
+```
+
+## Dataframe
+```{r ncasesyearcourtdf}
+datatable(n_cases_year_court)
+```
+
+## Code: Data
+```{r initialdata, eval=FALSE, echo=TRUE}
+```
+
+## Code: Plot
+
+```{r ncasesyearcourt, eval=FALSE, echo=TRUE}
+```
+
+# {-}
+
+We can see that the increase in the work of the CJ and the GC was mostly gradual. Interestingly, the oursourcing of the civil service agenda to the CST did not prevent the GC's caseload from rising during its period of operation (the jurisdiction was subsequently returned to the GC).
+
+# Forecasting {.tabset}
+
+As most other organizations, EU courts operate under a [budget constraint](https://doi.org/10.1007/s10657-021-09722-5) while facing some uncertainty about their future workload. When allocating its resources and preparing annual budgets, the CJEU needs to be able to forecast how many cases it is likely to have to deal with in the upcoming years.
+
+With information on the number of cases received in the past in hand, we can create a simple model that will attempt to predict the number of cases this year and next. In the presence of significant autocorrelation, using the number of cases received in previous years as predictors (lags) should give us decent forecasting mileage. To account for the fact that the CJ's caseload is linked to the GC's through appeal procedures, a regression equation can also include a lagged term for GC cases:
+
+$$
+Y_{t}^{CJ} = \beta_0 + \beta_1 Y_{t-1}^{CJ} + \beta_2 Y_{t-2}^{CJ} + \beta_3 Y_{t-3}^{CJ} + \beta_4 Y_{t-3}^{GC} + \epsilon_t
+$$
+Estimating the parameters in this equation via Gaussian or Poisson^[Because we are working with count data, Poisson regression should be in principle more appropriate.] regression provides a simple way of making predictions about $Y_t^{CJ}$.
+
+## Plot
+```{r forecast}
+# design matrix, trim current year
+dat_reg <- n_cases_year_court_labs |> 
+  filter(case_year > 1994,
+         court != "CST") |> 
+  mutate(lag1 = lag(n),
+         lag2 = lag(n, 2),
+         lag3 = lag(n, 3),
+         lag4 = lag(n, 4),
+         lag5 = lag(n, 5)) |> 
+  filter(case_year > 2000) |> 
+  select(court, case_year, n, starts_with("lag")) |> 
+  pivot_wider(id_cols = case_year, names_from = court, values_from = c(n, starts_with("lag")))
+
+# OLS estimates
+out_ols <- lm(
+  data = dat_reg |> filter(case_year < year_now),
+  formula = n_CJ ~ lag1_CJ + lag2_CJ + lag3_CJ + lag3_GC
+)
+
+# Poisson estimates
+out_poi <- glm(
+  data = dat_reg |> filter(case_year < year_now),
+  family = poisson(),
+  formula = n_CJ ~ lag1_CJ + lag2_CJ + lag3_CJ + lag3_GC
+)
+
+# OLS prediction
+yhat_ols <- as.integer(round(predict(out_ols, dat_reg[nrow(dat_reg),], type = "response"), 0))
+
+# Poisson prediction
+yhat_poi <- as.integer(round(predict(out_poi, dat_reg[nrow(dat_reg),], type = "response"), 0))
+
+# OLS prediction at t+1
+newdat_t1 <- tibble(
+  case_year = year_now + 1,
+  lags = dat_reg[nrow(dat_reg),] |> select(starts_with("lag")) |> as.vector() |> unlist() |> lag(2),
+  cols = dat_reg[nrow(dat_reg),] |> select(starts_with("lag")) |> colnames()
+) |> 
+  pivot_wider(names_from = cols, values_from = lags, values_fill = 0L)
+newdat_t1$lag1_CJ <- (yhat_ols + yhat_poi)/2 + sum(newdat_t1 |> select(contains("CJ")) |> unlist() |> diff(), na.rm = T)
+yhat_ols_t1 <- as.integer(round(predict(out_ols, newdat_t1, type = "response"), 0))
+
+# plot
+iplot_cases_forecast <- n_cases_year_court_labs |> 
+  mutate(tooltip = str_remove(tooltip, " \\(.*")) |> 
+  filter(case_year > year_now - 7,
+         court == "CJ") |> 
+  ggplot(aes(x = case_year, y = n)) + 
+  geom_col(data = tibble(case_year = year_now, n = yhat_ols),
+           aes(color = court_palette$color[court_palette$court == "CJ"],
+               fill = court_palette$color[court_palette$court == "CJ"]),
+           alpha = 0.15,
+           lty = 2,
+           show.legend = FALSE) +
+  geom_col_interactive(data = tibble(case_year = year_now+1,
+                         n = yhat_ols_t1, 
+                         tooltip = str_c("Predicted N = ", n),
+                         data_id = case_year),
+           aes(color = court_palette$color[court_palette$court == "CJ"],
+               fill = court_palette$color[court_palette$court == "CJ"],
+               tooltip = tooltip,
+               data_id = data_id),
+           alpha = 0.15,
+           lty = 2,
+           show.legend = FALSE) +
+  geom_col_interactive(aes(fill = color, tooltip = tooltip, data_id = case_year)) +
+  scale_fill_identity() +
+  scale_x_continuous(breaks = (year_now-7):(year_now+1)) +
+  theme_minimal(base_family = "Liberation Sans") + 
+  theme(panel.grid = element_blank(),
+        panel.grid.major.y = element_line(color = "grey94"),
+        #panel.grid.major.x = element_line(color = "grey94"),
+        axis.text = element_text(color = "grey10"),
+        axis.text.x = element_text(margin = margin(t = -6)),
+        plot.background = element_rect(fill = "white", color = "grey88"),
+        title = element_text(face = "bold"),
+        plot.subtitle = element_text(face = "italic"),
+        plot.caption = element_text(face = "italic", size = 8),
+        strip.text = element_text(hjust = 1, face = "bold")) +
+  labs(x = NULL, y = NULL,
+       title = "Number of cases received by the Court of Justice",
+       subtitle = "Forecast of this year and next based on previous years",
+       caption = "Predictions in dashed outlines")
+
+# interactive
+girafe(ggobj = iplot_cases_forecast,
+       dependencies = gdtools::liberationsansHtmlDependency(),
+       #fonts = list(sans = "Open Sans"),
+       #width_svg = 12,
+       #height_svg = 8,
+       options = list(opts_sizing(rescale = TRUE),
+                      opts_toolbar(saveaspng = FALSE),
+                      opts_tooltip(css = "background-color:gray;color:white;font-style:italic;padding:9px;border-radius:5px;font-size:15px;",
+                                   use_fill = TRUE),
+                      opts_hover_inv(css = "opacity:0.2;"),
+                      opts_hover(css = "fill:#fd014d;opacity:0.99;stroke:black;"))
+)
+```
+
+## Table
+```{r forecastreg}
+modelsummary(list("OLS" = out_ols, "Poisson" = out_poi),
+             statistic = 'conf.int', 
+             conf_level = 0.95,
+             stars = TRUE,
+             title = "Predicting yearly caseload at CJ")
+```
+
+## Code
+```{r forecast, eval=FALSE, echo=TRUE}
+```
+
+# {-}
+
+Both Gaussian and Poission regression yield comparable predictions for ```r year_now``` (```r yhat_ols``` versus ```r yhat_poi``` cases). The actual number of cases received so far this year represents ```r round(n_cases_year_court_labs$n[n_cases_year_court_labs$case_year==year_now & n_cases_year_court_labs$court=="CJ"] / yhat_ols,2)*100``` % of the predicted number.
+
+In order to obtain a prediction for ```r year_now+1``` using our model, we can plug in our prediction for ```r year_now``` as $Y_{t-1}^{CJ}$. The result is shown in the interactive plot. However, should our first prediction turn out way off the mark, we will be compounding the error in our subsequent prediction. Ours is an overly simplistic forecasting model -- in the real-world, we would hope to rely on other information than merely past values of $Y_t$ to make predictions, as well as relax some model assumptions.
+
+# Decisions {.tabset}
+
+```{r decisiondata}
+# sector 6 court data from eurlex
+allcourt <- elx_make_query(
+  "any",
+  sector = 6,
+  include_date = TRUE,
+  include_court_procedure = TRUE,
+  include_court_origin = TRUE,
+  include_original_language = TRUE,
+  include_court_formation = TRUE,
+  include_judge_rapporteur = TRUE,
+  include_ecli = TRUE
+) |>
+  elx_run_query()
+
+# bring data to celex level
+decisions <- allcourt |> 
+  mutate(clx_type = str_sub(celex, 6,7),
+         clx_num = as.integer(str_sub(celex, 8, 11)),
+         clx_year = as.integer(str_sub(celex, 2, 5)),
+         clx_court = str_sub(celex, 6, 6),
+         dec_type = case_when(
+           clx_type %in% c("CJ","TJ","FJ") ~ "Judgment",
+           clx_type %in% c("CO","CB","TO","TB","FO","FB") ~ "Order",
+           clx_type %in% c("CV","CX") ~ "Opinion",
+           T ~ NA_character_
+         )) |> 
+  filter(!is.na(dec_type),
+         !str_detect(celex, "_INF|_SUM")) |> 
+  separate_wider_delim(cols = courtprocedure, 
+                       delim = " - ",
+                       too_few = "align_start",
+                       too_many = "merge",
+                       cols_remove = TRUE,
+                       names = c("procedure", "procedure_outcome")) |> 
+  mutate(procedure = ifelse(clx_type %in% c("FB","FJ","FO") & is.na(procedure), "Staff case", procedure)) |> 
+  filter(!procedure %in% c("Rectification")) |> 
+  group_by(celex) |> # CBs don't have ECLI
+  reframe(
+    decision = str_c(unique(dec_type), collapse = "~~~"),
+    ecli = str_c(unique(ecli), collapse = "~~~"),
+    date = str_c(unique(date), collapse = "~~~"),
+    procedure = str_c(unique(procedure), collapse = "~~~"),
+    procedure_outcome = str_c(unique(procedure_outcome), collapse = "~~~"),
+    rapporteur = str_c(unique(jr), collapse = "~~~"),
+    formation = str_c(unique(cf), collapse = "~~~"),
+    language = str_c(unique(origlang), collapse = "~~~"),
+    origin = str_c(unique(courtorigin), collapse = "~~~"),
+  ) |> 
+  ungroup() |> 
+  mutate(across(everything(), ~str_squish(.)))
+
+# where both CO and CB present, keep only CO
+decisions <- decisions |> 
+  mutate(clx_type = str_sub(celex, 6,7),
+         clx_num = as.integer(str_sub(celex, 8, 11)),
+         clx_year = as.integer(str_sub(celex, 2, 5)),
+         clx_court = str_sub(celex, 6, 6),
+         clx_dec = str_sub(celex, 7, 7)) |> 
+  group_by(clx_court, clx_year, clx_num) |> 
+  mutate(
+    dupl = any(clx_dec %in% "B") & any(clx_dec %in% "O")
+  ) |> 
+  ungroup() |> 
+  filter(!(dupl == TRUE & clx_dec == "B")) |> 
+  select(-dupl)
+
+# title data to extract missing procedures
+missing_procs_titles <- decisions |> 
+  filter(is.na(procedure)) |> 
+  mutate(title = map_chr(str_c("http://publications.europa.eu/resource/celex/",
+                               celex), 
+                         possibly(eurlex::elx_fetch_data, otherwise = NA_character_), "title"))
+
+# parse the titles
+missing_procs_titles <- missing_procs_titles |> 
+  mutate(title = str_squish(title)) |> 
+  mutate(
+    procedure = case_when(
+      str_detect(title, "Rectification") ~ "Rectification",
+      str_detect(title, "Opinion of the Court|Request for an Opinion") ~ "Request for an Opinion",
+      str_detect(title, "DEP ") ~ "Other",
+      str_detect(celex, "FB") | str_detect(title, "[Ss]taff|[Cc]ivil [Ss]ervice") ~ "Staff case",
+      str_detect(title, "reliminary referen|for a prelim|reliminary ruli") ~ "Preliminary reference",
+      str_detect(title, "Commission( of the European Communities)? v (?!(Parliament|Council|European))") ~ "Failure to fulfil obligations",
+      str_detect(celex, "FB") | str_detect(title, "[Aa]nnulment|Trademark|Trade Mark") ~ "Action for annulment",
+      str_detect(celex, "FB") | str_detect(title, "damages") ~ "Action for damages",
+      str_detect(title, " (v|contre) (European Commission|Commission|Council|European Parliament|Parliament|EUIPO|OHIM|OHMI|ECB|Office for Har|European Union|Office de l'|EASO|EMA)") ~ "Action for annulment", # this is too broad but probably OK as approximation
+      T ~ NA_character_
+    ),
+    origin = case_when(
+      str_detect(title, "Czech Republic|Nejvyšš|Czechia") ~ "Czechia",
+      str_detect(title, "Slovak Republic|Najvyšš|Prešov|Slovakia") ~ "Slovakia",
+      str_detect(title, "Polish|Poland") ~ "Poland",
+      str_detect(title, "Belgiqu|Hof van Cass|Brussel|Belgium") ~ "Belgium",
+      str_detect(title, "Finland") ~ "Finland",
+      str_detect(title, "Salzburg|Wien|Austria") ~ "Austria",
+      str_detect(title, "Veliko Tarn|Varna|Bulgaria|Sofiys") ~ "Bulgaria",
+      str_detect(title, "Juzgado|Audiencia Provincial|Tribunal Superior de Justicia|Spain") ~ "Spain",
+      str_detect(title, "România|Romania") ~ "Romania",
+      str_detect(title, "Rijeci|Croati|lučice") ~ "Croatia",
+      str_detect(title, "Slovenia") ~ "Slovenia",
+      str_detect(title, "Cyprus") ~ "Cyprus",
+      str_detect(title, "Estonia") ~ "Estonia",
+      str_detect(title, "Sweden") ~ "Sweden",
+      str_detect(title, "Luxembourg") ~ "Luxembourg",
+      str_detect(title, "Denmark|Dane?mark") ~ "Denmark",
+      str_detect(title, "Hellenic|Greece|Simvoulio|Simboulio") ~ "Greece",
+      str_detect(title, "Portugese|Tribunal da Relação|(?<!TAP )Portugal") ~ "Portugal",
+      str_detect(title, "Lietuv|Vilniaus|Lithuania") ~ "Lithuania",
+      str_detect(title, "Latvijas|Augstākās|Latvia") ~ "Latvia",
+      str_detect(title, "Italia|Italy|Tribunale Amministrativ|Tribunale di|Consiglio di|Corte Su") ~ "Italy",
+      str_detect(title, "Bíróság|Magyar|Budapest|Szeged|Hungary|Hongri") ~ "Hungary",
+      str_detect(title, "Conseil d|(?<!Air )France") ~ "France",
+      str_detect(title, "Irland|(?<!Northern )Ireland") ~ "Ireland",
+      str_detect(title, "Netherlands|Den Haag|Raad van Ber|College van|Rechtbank Am|Raad [Vv]an St|Hoge Raad") ~ "Netherlands",
+      str_detect(title, "England \\& Wales|England and Wales|Her Majest|United Kingdom") ~ "United Kingdom",
+      str_detect(title, "Deutschland|Regensburg|Germany|Landgericht K|Amtsgericht") ~ "Germany",
+      T ~ NA_character_
+    )
+  )
+
+# simplify procedures
+decisions <- decisions |> 
+  filter(!celex %in% missing_procs_titles$celex) |> 
+  bind_rows(missing_procs_titles |> select(-title)) |> 
+  filter(!procedure %in% c("Rectification")) |> 
+  mutate(procedure_class = case_when(
+    str_detect(procedure, "eference.*preliminary|Preliminary reference") ~ "Preliminary rulings",
+    str_detect(procedure, "Action for annulm") ~ "Annulment procedures",
+    str_detect(procedure, "[Ff]ailure to fulf") ~ "Infringement proceedings",
+    str_detect(procedure, "[Ss]taff") ~ "Staff cases",
+    T ~ "Other"
+  )) |> 
+  mutate(court_long = case_when(
+    clx_court == "C" ~ "Court of Justice",
+    clx_court == "T" ~ "General Court",
+    clx_court == "F" ~ "Civil Service Tribunal",
+    T ~ NA_character_
+  )) |> 
+  mutate(court_long = fct_relevel(court_long, "Court of Justice", "General Court")) |> 
+  mutate(formation_simple = case_when(
+    str_detect(formation, "Grand Chamber") ~ "Grand Chamber",
+    str_detect(formation, "[Ff]ull [Cc]ourt") ~ "Full Court",
+    str_detect(formation, "Single|Vice-President|President|Judge hearing") ~ "Single Judge",
+    T ~ "Panel"
+  )) |> 
+  mutate(formation_simple = fct_relevel(formation_simple, "Full Court", "Grand Chamber", "Panel", "Single Judge")) |> 
+  mutate(decision_year = str_sub(date, 1, 4)) |> 
+  mutate(rapporteur = case_when( # correct some rapporteurs
+    str_detect(rapporteur, "O.Higgins") ~ "OHiggins",
+    str_detect(rapporteur, "O'Keeffe") ~ "OKeeffe",
+    str_detect(rapporteur, "Cz.cz") ~ "Czucz",
+    str_detect(rapporteur, ".an .er Woude") ~ "van der Woude",
+    T ~ rapporteur
+  ))
+
+# some manual corrections
+decisions <- decisions |> 
+  filter(!celex %in% c("62019CO0519")) |> # corrigendum
+  mutate(
+    origin = case_when(
+      celex == "62019CJ0550" ~ "Spain",
+      celex == "62020CJ0339" ~ "France",
+      celex == "62014CB0196" ~ "Germany",
+      celex == "62022CB0578" ~ "Germany",
+      celex == "62023CB0052" ~ "Germany",
+      T ~ origin
+      ),
+    language = case_when(
+      celex == "62017CO0707" ~ "Bulgarian",
+      celex == "62020CJ0306" ~ "Latvian",
+      celex == "62017CJ0122" ~ "English",
+      celex == "62018CJ0276" ~ "Hungarian",
+      celex == "62013CJ0512" ~ "Dutch",
+      celex == "62022CJ0142" ~ "English",
+      celex == "61987CJ0245" ~ "German",
+      celex == "62000CJ0167" ~ "German",
+      celex == "62012CJ0293" ~ "English~~~German",
+      T ~ language
+    )
+  )
+
+# appeals and outcomes
+
+```
+
+The number of cases received by EU courts is not identical to the number of judicial decisions they produce. Some cases are withdrawn by the applicants or otherwise discontinued, others are joined and decided together.
+
+The EU judicial system distinguishes between different types of public decisions. The two most common types are judgments and orders. Orders are typically employed to settle disputes more "economically" -- they normally contain a shorter justification and address broadly speaking less important issues.
+
+We can get an approximate overview of the number of decisions produced by EU courts using the Eur-Lex API.
+
+## Plot
+```{r decisiontypeplot}
+# data frame for plotting
+n_dec_type_proc <- decisions |> 
+  filter(decision != "Opinion",
+         procedure_class != "Other",
+         clx_court == "C") |> 
+  count(decision_year, decision, procedure_class, court_long) |> 
+  drop_na()
+
+# make plot
+iplot_dec_procs <- n_dec_type_proc |> 
+  left_join(court_palette) |> 
+  mutate(tooltip = str_c(decision, "s = ", n, " (", decision_year, ")"),
+         data_id = str_c(clx_court, decision_year, procedure_class, decision)) |> 
+  ggplot(aes(x = as.integer(decision_year), y = n, fill = decision)) +
+  geom_col_interactive(color = "grey96", show.legend = FALSE,
+                       aes(tooltip = tooltip, data_id = data_id)) +
+  #scale_fill_identity() +
+  #scale_colour_identity() +
+  scale_fill_manual_interactive(values = c("#fd014d","#eda1b8")) +
+  scale_x_continuous(breaks = seq(from = 1950, to = year_now+1, by = 10)) +
+  facet_wrap(~fct_infreq(procedure_class), dir = "v", scales = "free_y") +
+  theme_minimal(base_family = "Liberation Sans") +
+  theme(panel.grid = element_blank(),
+        panel.grid.major.y = element_line(color = "grey94"),
+        panel.grid.major.x = element_line(color = "grey94"),
+        axis.text = element_text(color = "grey10"),
+        plot.background = element_rect(fill = "white", color = "grey88"),
+        title = element_text(face = "bold"),
+        plot.subtitle = element_text(face = "italic"),
+        plot.caption = element_text(face = "italic", size = 8),
+        strip.text = element_text(hjust = 1, face = "bold")) +
+  labs(x = NULL, y = NULL,
+       title = "Number of decisions handed down by the Court of Justice",
+       subtitle = "Aggregated by year and procedure")
+
+# interactive
+girafe(ggobj = iplot_dec_procs,
+       dependencies = gdtools::liberationsansHtmlDependency(),
+       #fonts = list(sans = "Open Sans"),
+       #width_svg = 12,
+       #height_svg = 8,
+       options = list(opts_sizing(rescale = TRUE),
+                      opts_toolbar(saveaspng = FALSE),
+                      opts_tooltip(css = "background-color:gray;color:white;font-style:italic;padding:9px;border-radius:5px;font-size:15px;",
+                                   use_fill = TRUE),
+                      opts_hover_inv(css = "opacity:0.2;"),
+                      opts_hover(css = "opacity:0.99;stroke:black;")))
+```
+
+## Dataframe
+```{r ndecstypeproc}
+datatable(n_dec_type_proc)
+```
+
+## Code: Data
+```{r decisiondata, eval=FALSE, echo=TRUE}
+```
+
+## Code: Plot
+
+```{r decisiontypeplot, eval=FALSE, echo=TRUE}
+```
+
+# {-}
+
+The Court of Justice sees the highest diversity of procedures, even though the General Court is set to adjudicate a greater variety of cases in the future in response to workload pressures and past court reforms.
+
+The four main types of procedures are the preliminary ruling procedure (Article 267 TFEU), the annulment procedure (Article 263 TFEU), the infringement procedure (Article 258 TFEU) and staff cases. We can see that the CJ has been handing down a seemingly ever-increasing number of preliminary rulings on questions referred by national courts. As the CJ's workload expanded, the Court increased the frequency with which it uses orders rather than judgments.
+
+```{r formationproportion}
+# plot
+iplot_dec_formation <- decisions |> 
+  filter(clx_court == "C") |> 
+  count(decision_year, formation_simple) |> 
+  filter(as.integer(decision_year) > 2004) |> 
+  group_by(decision_year) |> 
+  mutate(sum_n = sum(n),
+         prop = n / sum(n)) |> 
+  ungroup() |> 
+  mutate(tooltip = str_c(formation_simple, " = ", round(prop, 3)*100, "% (", decision_year, ")"),
+         data_id = str_c(decision_year, formation_simple)) |> 
+  ggplot(aes(x = as.integer(decision_year), y = prop, fill = formation_simple)) + 
+  geom_col_interactive(color = "grey96", show.legend = FALSE,
+                       aes(tooltip = tooltip, data_id = data_id)) +
+  scale_y_continuous(labels = scales::percent) +
+  scale_fill_manual_interactive(values = c("#e63c88","#fd014d","#fe99b8","#b10136")) +
+  scale_x_continuous(breaks = seq(from = 2005, to = year_now+1, by = 3)) +
+  theme_minimal(base_family = "Liberation Sans") +
+  theme(panel.grid = element_blank(),
+        panel.grid.major.y = element_line(color = "grey94"),
+        panel.grid.major.x = element_line(color = "grey94"),
+        axis.text = element_text(color = "grey10"),
+        plot.background = element_rect(fill = "white", color = "grey88"),
+        title = element_text(face = "bold"),
+        plot.subtitle = element_text(face = "italic"),
+        plot.caption = element_text(face = "italic", size = 8),
+        strip.text = element_text(hjust = 1, face = "bold")) +
+  labs(x = NULL, y = NULL,
+       title = "Proportion of decisions by formation",
+       subtitle = "Data for the Court of Justice")
+
+# interactive
+girafe(ggobj = iplot_dec_formation,
+       dependencies = gdtools::liberationsansHtmlDependency(),
+       #fonts = list(sans = "Open Sans"),
+       #width_svg = 12,
+       #height_svg = 8,
+       options = list(opts_sizing(rescale = TRUE),
+                      opts_toolbar(saveaspng = FALSE),
+                      opts_tooltip(css = "background-color:gray;color:white;font-style:italic;padding:9px;border-radius:5px;font-size:15px;",
+                                   use_fill = TRUE),
+                      opts_hover_inv(css = "opacity:0.2;"),
+                      opts_hover(css = "opacity:0.99;stroke:black;")))
+```
+
+Decisions can be further classified by the deciding court formation. The most important cases at the CJ are decided by more than ten judges in a formation known as the "Grand Chamber". On special occasions, the CJ even sits as the "Full Court" (all judges decide). Most cases are decided by a panel (chamber) of five judges.
+
+```{r rapporteurs}
+# pick top rapporteurs to show
+top_rapps <- decisions |> 
+  filter(clx_court %in% c("C","T"),
+         procedure_class != "Other",
+         decision == "Judgment") |> # too many orders missing 
+  mutate(inv_court = ifelse(clx_court == "C", "  ", " ")) |> 
+  mutate(rapporteur = str_c(inv_court, rapporteur)) |> 
+  count(court_long, rapporteur) |> 
+  drop_na() |> 
+  mutate(sum = sum(n), .by = c(court_long, rapporteur)) |> 
+  arrange(-sum) |> 
+  group_by(court_long) |> 
+  slice_head(n = 20) |> 
+  ungroup()
+
+# plot
+iplot_dec_rapp <- decisions |> 
+  filter(clx_court %in% c("C","T"),
+         procedure_class != "Other",
+         decision == "Judgment") |> # too many orders missing 
+  mutate(inv_court = ifelse(clx_court == "C", "  ", " ")) |> 
+  mutate(rapporteur = str_c(inv_court, rapporteur)) |> 
+  filter(rapporteur %in% top_rapps$rapporteur) |>  
+  count(court_long, rapporteur, procedure_class) |> 
+  drop_na() |> 
+  mutate(sum = sum(n), .by = c(court_long, rapporteur)) |> 
+  arrange(-sum) |> 
+  left_join(court_palette) |> 
+  mutate(color = case_when(
+    court == "CJ" & procedure_class == "Staff cases" ~ "#ffe6ed",
+    court == "CJ" & procedure_class == "Preliminary rulings" ~ "#fe99b8",
+    court == "CJ" & procedure_class == "Infringement proceedings" ~ "#fe6794",
+    court == "GC" & procedure_class == "Staff cases" ~ "#8993b8",
+    T ~ color
+  )) |> 
+  mutate(tooltip = str_c(procedure_class, " = ", n, " (", str_squish(rapporteur),")"),
+         data_id = str_c(court_long, rapporteur, procedure_class)) |>
+  ggplot(aes(x = n, y = reorder(rapporteur, sum), fill = color)) +
+  geom_col_interactive(color = "grey96", show.legend = FALSE,
+                       aes(tooltip = tooltip, data_id = data_id),
+                       position = "stack"
+                       ) +
+  scale_fill_identity() +
+  scale_y_discrete(expand = expansion(0, 0)) +
+  scale_x_continuous(expand = c(0, 0)) +
+  facet_wrap(~court_long, dir = "v", scales = "free") +
+  theme_minimal(base_family = "Liberation Sans") +
+  theme(panel.grid = element_blank(),
+        panel.grid.major.y = element_line(color = "grey94"),
+        panel.grid.major.x = element_line(color = "grey94"),
+        axis.text = element_text(color = "grey10"),
+        plot.background = element_rect(fill = "white", color = "grey88"),
+        title = element_text(face = "bold"),
+        plot.subtitle = element_text(face = "italic"),
+        plot.caption = element_text(face = "italic", size = 8),
+        strip.text = element_text(hjust = 1, face = "bold")) +
+  labs(x = NULL, y = NULL,
+       title = "The most frequent judge-rapporteurs",
+       subtitle = "Only taking into account judgments and main procedures")
+
+# interactive
+girafe(ggobj = iplot_dec_rapp,
+       dependencies = gdtools::liberationsansHtmlDependency(),
+       #fonts = list(sans = "Open Sans"),
+       #width_svg = 12,
+       #height_svg = 8,
+       options = list(opts_sizing(rescale = TRUE),
+                      opts_toolbar(saveaspng = FALSE),
+                      opts_tooltip(css = "background-color:gray;color:white;font-style:italic;padding:9px;border-radius:5px;font-size:15px;",
+                                   use_fill = TRUE),
+                      opts_hover_inv(css = "opacity:0.2;"),
+                      opts_hover(css = "opacity:0.99;stroke:black;")))
+```
+
+Each decision is assigned a judge-rapporteur. This judge has the primary responsibility for drafting the decision. The main predictor of how many decisions a judge writes is the length of their tenure at the court. In principle, judges can be reappointed to EU courts any number of times.
+
+# Preliminary references {.tabset}
+
+Historically the most important subset of CJEU cases is generated through the preliminary ruling procedure (Article 267 TFEU). The most well-known CJ decisions -- such as _Costa v ENEL_ and _Cassis de Dijon_ -- originate in references from national courts to Luxembourg.
+
+## Plot
+```{r prelrefdata}
+
+# from decision level to reference level
+references <- decisions |> 
+  filter(str_detect(procedure_class ,"Preliminary")) |> 
+  separate_rows(origin, sep = "~~~") |> 
+  filter(!is.na(origin))
+
+# could add validation of origin and language here (done as of 5/10/23)
+# references |> 
+#   mutate(origin_lang_match = case_when(
+#     origin == "Czechia" & str_detect(language, "Czec") ~ T,
+#     origin == "Slovakia" & str_detect(language, "Slovak") ~ T,
+#     origin == "Italy" & str_detect(language, "Ital|German") ~ T,
+#     origin == "Poland" & str_detect(language, "Polish") ~ T,
+#     origin == "France" & str_detect(language, "French") ~ T,
+#     origin == "Belgium" & str_detect(language, "French|Dutch|German") ~ T,
+#     origin == "Ireland" & str_detect(language, "English|Gael|Irish") ~ T,
+#     origin == "Austria" & str_detect(language, "German|Sloven") ~ T,
+#     origin == "Bulgaria" & str_detect(language, "Bulgar") ~ T,
+#     origin == "Spain" & str_detect(language, "Spani") ~ T,
+#     origin == "Romania" & str_detect(language, "Romani") ~ T,
+#     origin == "Croatia" & str_detect(language, "Croati") ~ T,
+#     origin == "Greece" & str_detect(language, "Greek") ~ T,
+#     origin == "Cyprus" & str_detect(language, "Greek") ~ T,
+#     origin == "Estonia" & str_detect(language, "Estonian") ~ T,
+#     origin == "Finland" & str_detect(language, "Finnish|Swedish") ~ T,
+#     origin == "Denmark" & str_detect(language, "Danish") ~ T,
+#     origin == "Sweden" & str_detect(language, "Swedish") ~ T,
+#     origin == "Luxembourg" & str_detect(language, "French") ~ T,
+#     origin == "Malta" & str_detect(language, "Maltese|English") ~ T,
+#     origin == "Slovenia" & str_detect(language, "Sloven") ~ T,
+#     origin == "Portugal" & str_detect(language, "Portug") ~ T,
+#     origin == "Lithuania" & str_detect(language, "Lithuan") ~ T,
+#     origin == "Latvia" & str_detect(language, "Latvia") ~ T,
+#     origin == "Hungary" & str_detect(language, "Hungar") ~ T,
+#     origin == "Netherlands" & str_detect(language, "Dutch") ~ T,
+#     origin == "United Kingdom" & str_detect(language, "English") ~ T,
+#     origin == "Germany" & str_detect(language, "German") ~ T,
+#     T ~ FALSE
+#   )) |> 
+#   #filter(origin == "Austria", language == "English") |> View()
+#   count(origin_lang_match, origin, language) |> View()
+
+# country ref number
+n_refs_country <- references |> 
+  arrange(date) |> 
+  group_by(origin) |> 
+  summarize(
+    year_first = clx_year[1],
+    n_refs = n()
+  ) |> 
+  mutate(ttip = str_c(origin,": ", n_refs," references. <br>", "First case referred in ", year_first, "."))
+
+# prepare map data
+refs_map_dat <- map_data("world",xlim=c(-10.6600,51.5500), ylim=c(34.5000,71.0500)) |> 
+  mutate(region = ifelse(region == "Czech Republic", "Czechia", region),
+         region = ifelse(region == "UK", "United Kingdom", region))
+
+#map("world",xlim=c(-10.6600,31.5500), ylim=c(34.5000,71.0500))
+
+# map plot
+iplot_map_refs <- n_refs_country |> 
+  ggplot() +
+  geom_map_interactive(
+    aes(map_id = origin,
+        fill = n_refs,
+        tooltip = ttip,
+        data_id = origin),
+    map = refs_map_dat,
+    show.legend = FALSE,
+    color = "grey28",
+    size = 0.2
+  ) +
+  #annotate("text", label = "The UK was an EU member between 1973 and 2020.", size = 2.6,
+  #         x = -1.8, y = 65) +
+  expand_limits(x = c(-13.6600,38.5500), y = c(34.5000,71.0500)) +
+  scale_fill_gradient_interactive(low = "#8993b8", high = "#fe6794") +
+  theme_minimal(base_family = "Liberation Sans") +
+  theme(panel.grid = element_blank(),
+        axis.text = element_blank(),
+        plot.background = element_rect(fill = "white", color = "grey88"),
+        title = element_text(face = "bold"),
+        plot.subtitle = element_text(face = "italic"),
+        plot.caption = element_text(face = "italic", size = 8),
+        strip.text = element_text(hjust = 1, face = "bold")) +
+  labs(x = NULL, y = NULL,
+       title = "Preliminary references by country of origin",
+       subtitle = "Total number of closed cases referred by all national courts")
+
+# interactive
+girafe(ggobj = iplot_map_refs,
+       dependencies = gdtools::liberationsansHtmlDependency(),
+       #fonts = list(sans = "Open Sans"),
+       #width_svg = 12,
+       #height_svg = 8,
+       options = list(opts_sizing(rescale = TRUE),
+                      opts_toolbar(saveaspng = FALSE),
+                      opts_tooltip(css = "background-color:gray;color:white;font-style:italic;padding:9px;border-radius:5px;font-size:15px;",
+                                   use_fill = TRUE),
+                      opts_hover_inv(css = "opacity:0.2;"),
+                      opts_hover(css = "opacity:0.99;stroke:gray;")))
+```
+
+## Dataframe
+```{r prelrefdatadf}
+datatable(n_refs_country)
+```
+
+## Code: Plot
+```{r prelrefdata, eval=FALSE, echo=TRUE}
+```
+
+# {-}
+
+From a geographical perspective, preliminary references from national courts are very unevenly distributed. By far the highest number of references has come from Germany. Naturally, there is a relationship between the length of a country's membership and the total number of preliminary references. [Research](https://doi.org/10.1080/13501763.2020.1744688) has shown that there are also important subnational disparities.
+
+```{r prelreftime}
+
+# create MS panel
+ms_years_panel <- tibble(year = 1952:year_now) |> 
+  left_join(enlargements) |> 
+  fill(n_ms,ms_composition) |> 
+  mutate(across(.cols = c(year,n_ms),
+                .fns = ~as.integer(.))) |> 
+  separate_rows(ms_composition, sep = "~~~") |> 
+  rename(origin = ms_composition) |> 
+  filter(year > 1960)
+
+# country year counts
+n_ref_year <- references |> 
+  arrange(date) |> 
+  rename(year = clx_year) |> 
+  group_by(origin, year) |> 
+  summarize(n_refs = n()) |> 
+  ungroup() |> 
+  mutate(data_id = str_c(origin,year),
+         ttip = str_c("N = ", n_refs, " (", year, ")"))
+
+# add zeros
+n_ref_year_all <- ms_years_panel |> 
+  left_join(n_ref_year) |> 
+  mutate(n_refs = ifelse(is.na(n_refs), 0L, n_refs)) |> 
+  mutate(data_id = str_c(origin,year),
+         ttip = str_c("N = ", n_refs, " (", year, ")"))
+
+# interactive plot
+iplot_refs_time <- n_ref_year_all |> 
+  ggplot(aes(x = year, y = n_refs)) +
+  geom_point_interactive(aes(
+    data_id = data_id,
+    tooltip = ttip,
+  ), color = "#fe99b8", alpha = 0.34, size = 0.75) +
+  geom_smooth(fill = "#8993b8", color = "#fe99b8", alpha = 0.13, linewidth = 0.6) +
+  scale_y_continuous(breaks = function(x) unique(floor(pretty(seq(0, (max(x) + 1) * 1.1)))),
+                     limits = c(0,NA)) +
+  scale_x_continuous(breaks = scales::pretty_breaks(3)) +
+  #scale_x_continuous(breaks = function(x) c(min(round(floor(x)), na.rm = T), max(round(x)))) +
+  facet_wrap(~origin, scales = "free") +
+  theme_minimal(base_family = "Liberation Sans") +
+  theme(panel.grid = element_blank(),
+        panel.grid.major.y = element_line(color = "grey94", linewidth = 0.2),
+        panel.grid.major.x = element_line(color = "grey94", linewidth = 0.2),
+        axis.text = element_text(color = "grey10", size = 5),
+        plot.background = element_rect(fill = "white", color = "grey88"),
+        title = element_text(face = "bold"),
+        plot.subtitle = element_text(face = "italic"),
+        plot.caption = element_text(face = "italic", size = 8),
+        plot.margin = margin(t = 8, r = 10, b = 10, l = 6, unit = "pt"),
+        strip.text = element_text(hjust = 1, face = "bold", size = 6)) +
+  labs(x = NULL, y = NULL,
+       title = "Preliminary references over time",
+       subtitle = "Number of closed cases referred by national courts by country and year")
+
+# interactive
+girafe(ggobj = iplot_refs_time,
+       dependencies = gdtools::liberationsansHtmlDependency(),
+       #fonts = list(sans = "Open Sans"),
+       #width_svg = 12,
+       #height_svg = 8,
+       options = list(opts_sizing(rescale = TRUE),
+                      opts_zoom(min = .7, max = 2),
+                      opts_toolbar(saveaspng = FALSE),
+                      opts_tooltip(css = "background-color:gray;color:white;font-style:italic;padding:9px;border-radius:5px;font-size:15px;",
+                                   use_fill = TRUE),
+                      opts_hover_inv(css = "opacity:0.2;"),
+                      opts_hover(css = "opacity:0.99;stroke:black;")))
+```
+
+In general, referral activity increased over time in most countries. The CJEU and its preliminary ruling procedure gradually gained prominence. Interestingly, the gradual increase in references is also visible for countries that joined the EU more recently when the importance of the CJEU was already well-established. Despite the overall trend, there are also notable differences in the temporal patterns between countries (compare Ireland and Denmark, for example).^[However, because the data used here is not fully accurate, we should not make too much of any individual data point.] Note that the data comes from _closed_ cases -- many referrals in recent years are still pending before the CJEU.
+
+<!-- # Appeals -->
+<!-- Number of appeals from GC to CJ, need to also code outcomes -->
+
+<!-- # Citation network -->
+<!-- use Eur-Lex citation data -->
+
+# Cite
+
+Cite this document as `r cit_page`.

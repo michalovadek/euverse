@@ -1,0 +1,856 @@
+---
+title: "Legislative Output of the European Union"
+subtitle: "An Automatically Updated Overview of the EU's Legislative Activity"
+author: Dr Michal Ovádek
+output: 
+  html_document:
+    df_print: paged
+    number_sections: true
+    toc: true
+    toc_float: true
+    theme: cosmo
+    highlight: tango
+---
+
+<style>
+body {
+text-align: justify}
+</style>
+
+<style type="text/css">
+  body{
+  font-size: 13pt;
+}
+</style>
+
+<style>
+.tocify-extend-page {
+  height: 30px !important;
+}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      warning = FALSE,
+                      message = FALSE,
+                      error = FALSE,
+                      fig.width = 9,
+                      fig.height = 6)
+```
+
+
+```{r initialdata, include=FALSE}
+
+# packages
+library(eurlex)
+library(ggplot2)
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(stringr)
+library(rmarkdown)
+library(modelsummary)
+library(ggiraph)
+library(equatiomatic)
+library(DT)
+library(gdtools)
+library(gfonts)
+
+# seed
+set.seed(35239)
+
+# fonts
+gdtools::register_liberationsans()
+#addGFontHtmlDependency(family = "Open Sans")
+
+# current date
+date_now <- Sys.Date()
+date_now_f <- str_remove(format(date_now, "%d %B %Y"), "^0")
+day_now <- as.integer(str_sub(date_now, 9, 10))
+year_now <- as.integer(str_sub(date_now, 1, 4))
+
+# acts
+acts_proposals <- elx_make_query("any", sector = 3,
+                                 include_date = TRUE,
+                                 include_proposal = TRUE) |>
+  elx_run_query() |> 
+  select(-work)
+
+# acts only
+acts <- acts_proposals |> 
+  filter(!is.na(celex),
+         !date %in% c("1003-03-03")) |> 
+  distinct(celex, .keep_all = T) |> 
+  select(-proposal)
+
+# in force
+in_force <- elx_make_query("any", sector = 3,
+                           include_force = TRUE,
+                           include_date_force = TRUE) |>
+  elx_run_query() |> 
+  select(-work) |> 
+  rename(date_force = dateforce) |> 
+  arrange(celex, date_force) |> 
+  distinct(celex, .keep_all = TRUE) |> 
+  drop_na() |> 
+  filter(between(as.Date(date_force), as.Date("1952-01-01"),
+                 as.Date(date_now)))
+
+# 4 main types of acts
+regs <- acts |> filter(str_sub(celex,6,6) == "R")
+decs <- acts |> filter(str_sub(celex,6,6) == "D")
+dirs <- acts |> filter(str_sub(celex,6,6) == "L")
+recs <- acts |> filter(str_sub(celex,6,6) == "H")
+
+# proposals
+proposals <- elx_make_query("proposal", include_date = TRUE) |> 
+  elx_run_query() |> 
+  select(-work,-type) |> 
+  rename(date_proposal = date) |> 
+  filter(!is.na(celex),
+         !is.na(date_proposal)) |> 
+  distinct(celex, .keep_all = TRUE)
+
+# latest act titles and EuroVoc
+recent_titles <- acts |> 
+  arrange(desc(date), desc(celex)) |> 
+  filter(str_sub(celex,6,6) %in% c("D","R","L","H")) |> 
+  slice(1:50) |> 
+  mutate(title = map_chr(str_c("http://publications.europa.eu/resource/celex/",
+                               celex), 
+                         possibly(eurlex::elx_fetch_data, otherwise = NA_character_), "title")) |> 
+  mutate(date = as.Date(date))
+
+# citation
+cit_page <- paste("Michal Ovádek, '",rmarkdown::metadata$title,"', available at https://michalovadek.github.io/eulaw/, accessed on ", date_now_f,
+                  sep = "")
+```
+
+The European Union (EU) is often criticized for having a heavy regulatory touch and being unwieldy. What is the reality? This automatically updated research document gives a real-time overview of the EU's legislative output and efficiency.
+
+As of ```r format(Sys.time(), '%d %B %Y')```, the EU and its predecessors have produced ```r nrow(regs)``` regulations, ```r nrow(dirs)``` directives, ```r nrow(decs)``` decisions and ```r nrow(recs)``` recommendations, according to [Eur-Lex](https://eur-lex.europa.eu/homepage.html) data pulled via the [eurlex](https://github.com/michalovadek/eurlex) package for R^[See https://github.com/michalovadek/eurlex for more details.] and a SPARQL API maintained by the Publications Office of the European Union.^[This also means that any omissions and mistakes present in Eur-Lex are carried through to the output shown here.] (More example use cases, as well as arguments for integrating open data APIs into research workflows, can be found in this [open access paper](https://www.tandfonline.com/doi/full/10.1080/2474736X.2020.1870150).)
+
+The following table shows the most recent legislation published by the EU:
+
+```{r mostrecenttable}
+recent_titles |> 
+  datatable(rownames = FALSE,
+            options = list(pageLength = 5,
+                           autoWidth = TRUE,
+                           columnDefs = list(list(targets = 1, width = '85px')))) |> 
+  formatStyle('celex',  fontWeight = 'bold')
+```
+
+# Number of acts over time {.tabset}
+
+We start by looking at how the number of the four main legal acts changed over the lifespan of the EU. The number of acts adopted yearly is a parsimonious – but imperfect^[We should also take into account the regulatory breadth and depth of each legal act. A decision increasing the tariff on steel by 5 per cent is a very different act from, say, the General Data Protection Regulation. ] – proxy for the EU's regulatory tendencies.
+
+## Plot
+
+```{r ncounttime}
+
+# select only main act types
+relevant_acts <- bind_rows(Regulation = regs, Decison = decs, Directive = dirs,
+                           Recommendation = recs,
+                        .id = "type") |> 
+  mutate(year = as.integer(str_sub(celex, 2,5))) |> 
+  mutate(month_year = as.Date(str_replace(date, "[:digit:][:digit:]$", "01")))
+
+# count
+n_relevant <- relevant_acts |> 
+  count(year, type)
+
+# viz
+ggplot(n_relevant, aes(x = year, y = n, fill = type, color = type)) +
+  geom_col(show.legend = FALSE) +
+  scale_fill_brewer(palette = "Spectral") +
+  scale_color_brewer(palette = "Spectral") +
+  facet_wrap(~type, scale = "free_y") +
+  theme_minimal() +
+  theme(legend.position = "top",
+        legend.justification = "left",
+        legend.title = element_text(face = "italic"),
+        plot.background = element_rect(fill = "white", color = "grey88"),
+        panel.grid = element_line(color = "grey95"),
+        axis.text = element_text(color = "grey10"),
+        title = element_text(face = "bold"),
+        plot.subtitle = element_text(face = "italic"),
+        strip.text = element_text(hjust = 0, face = "bold")) +
+  labs(x = NULL,
+       y = "Number of acts",
+       title = "Number of legal acts produced by the European Union",
+       subtitle = "Aggregated at the year level by date of publication")
+
+# vars for text
+year1 <- as.integer(str_sub(date_now,1,4))-1
+year2 <- as.integer(str_sub(date_now,1,4))-2
+
+n_year1 <- n_relevant |> 
+  filter(year == year1) |> 
+  summarise(n = sum(n, na.rm = T)) |> 
+  as.integer()
+
+n_year2 <- n_relevant |> 
+  filter(year == year2) |> 
+  summarise(n = sum(n, na.rm = T)) |> 
+  as.integer()
+
+nyeardif <- ifelse(n_year1 < n_year2, "less than", "more than")
+nyeardif <- ifelse(n_year1 == n_year2, "the same as", nyeardif)
+
+```
+
+## Dataframe
+```{r ncounttimedf}
+datatable(n_relevant)
+```
+
+## Code: Data
+```{r initialdata, eval=FALSE, echo=TRUE}
+```
+
+## Code: Plot
+
+```{r ncounttime, eval=FALSE, echo=TRUE}
+```
+
+# {-}
+
+In ```r year1```, the EU produced ```r n_year1``` legal acts which is ```r nyeardif``` the ```r n_year2``` acts in ```r year2```. Overall, the EU's legislative output is currently considerably lower compared to, in particular, the 1980s and 1990s.
+
+# Proportion of act types {.tabset}
+
+So we see there is significant over-time variation in the use of the different types of legal acts, but some types of acts, notably regulations, have been historically significantly more common than other types of acts. We can visualize the evolution of proportions directly.
+
+## Plot
+
+```{r proptime}
+
+# create df
+proptime_df <- expand.grid(year = min(n_relevant$year):max(n_relevant$year),
+            type = unique(n_relevant$type)) |> 
+  left_join(n_relevant) |> 
+  mutate(n = ifelse(is.na(n), 0L, n)) |> 
+  group_by(year) |> 
+  mutate(total_y = sum(n),
+         proportion = n/total_y) |> 
+  ungroup()
+
+# viz
+proptime_df |> 
+  ggplot(aes(x = year, y = proportion, fill = type, color = type)) +
+  geom_area(show.legend = TRUE) +
+  geom_vline(xintercept = c(1960,1980,2000,2020), lty = 2, color = "grey70") +
+  geom_hline(yintercept = 0.50, color = "grey50", lty = 3) +
+  scale_fill_brewer(palette = "Spectral") +
+  scale_color_brewer(palette = "Spectral") +
+  theme_minimal() +
+  theme(legend.position = "top",
+        legend.justification = "left",
+        legend.title = element_text(face = "italic"),
+        plot.background = element_rect(fill = "white", color = "grey88"),
+        panel.grid = element_blank(),
+        axis.text = element_text(color = "grey10"),
+        title = element_text(face = "bold"),
+        plot.subtitle = element_text(face = "italic"),
+        strip.text = element_text(hjust = 0, face = "bold")) +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
+  labs(x = NULL,
+       y = NULL,
+       color = NULL,
+       fill = NULL,
+       title = "Relative prevalence of legal acts",
+       subtitle = "Proportion of each type of legal act in a given year")
+```
+
+## Code
+
+```{r proptime, eval=FALSE, echo=TRUE}
+```
+
+## Dataframe
+```{r proptimedf}
+datatable(proptime_df)
+```
+
+# {-}
+
+We can see that although regulations used to dominate the EU's legislative output, decisions – which are typically associated with various administrative actions – are nowadays almost equally prevalent.
+
+The rise in the number of recommendations can be mostly attributed to the strengthening of the EU's role in the surveillance and coordination of the Member States' economic policies.
+
+# Year-on-year comparison {.tabset}
+
+The daily streaming of data can be relied on to make completely up-to-date comparisons of EU legislative activity. For example, we can look at the extent to which the monthly adoption rate of legal acts this year differs from last year.
+
+## Plot
+
+```{r yearonyear}
+# monthly output last two years
+last_two_years <- relevant_acts |> 
+  mutate(year = as.integer(str_sub(date, 1,4))) |> 
+  filter(year %in% c(max(relevant_acts$year), max(relevant_acts$year)-1)) |> 
+  count(month_year, type)
+
+last_two_years_full <- expand.grid(month_year = unique(last_two_years$month_year),
+                                   type = unique(last_two_years$type)) |> 
+  left_join(last_two_years) |> 
+  mutate(n = ifelse(is.na(n), 0L, n))
+
+# year on year change
+last_two_yoy_diff <- last_two_years_full |> 
+  arrange(month_year) |> 
+  mutate(month = str_sub(month_year, 6,7)) |> 
+  group_by(month, type) |> 
+  reframe(yoy_diff = diff(n))
+
+# this month for text
+this_month_yoy <- last_two_yoy_diff |> 
+  arrange(desc(month)) |> 
+  slice(1:4) |> 
+  summarise(sum = sum(yoy_diff)) |> 
+  as.integer()
+
+this_month_yoy_dir <- ifelse(this_month_yoy < 0, "fewer than", "more than")
+#this_month_yoy_dir <- ifelse(this_month_yoy == 0, "the same as", this_month_yoy)
+
+this_month_yoy_abs <- abs(this_month_yoy)
+
+# viz
+last_two_yoy_diff |> 
+  ggplot(aes(x = month, y = yoy_diff, fill = type, color = type)) +
+  geom_col(show.legend = FALSE) +
+  geom_hline(yintercept = 0, color = "grey83", lty = 1) +
+  facet_wrap(~type, scales = "free_y") +
+  scale_fill_brewer(palette = "Spectral") +
+  scale_color_brewer(palette = "Spectral") +
+  theme_minimal() +
+  theme(legend.position = "top",
+        legend.justification = "left",
+        legend.title = element_text(face = "italic"),
+        plot.background = element_rect(fill = "white", color = "grey88"),
+        panel.grid = element_blank(),
+        axis.text = element_text(color = "grey10"),
+        title = element_text(face = "bold"),
+        plot.subtitle = element_text(face = "italic"),
+        strip.text = element_text(hjust = 0, face = "bold")) +
+  labs(x = "Month", y = "Year-on-year difference",
+       title = "Monthly year-on-year comparison",
+       subtitle = "Difference in the number of acts adopted this year compared to last year")
+
+```
+
+## Code
+
+```{r yearonyear, eval=FALSE, echo=TRUE}
+```
+
+## Dataframe
+```{r yoydf}
+datatable(last_two_yoy_diff)
+```
+
+# {-}
+
+So far this month, the EU has adopted ```r this_month_yoy_abs``` legal acts ```r this_month_yoy_dir``` the same month last year. `r if(day_now < 16){"But we are still early in the month."}`
+
+# Acts in force {.tabset}
+
+Naturally, not all legal acts remain in force indefinitely, which means that many of the ```r nrow(acts)``` acts ever adopted by the EU are mere relics of the past.
+
+According to Eur-Lex, the EU has ```r nrow(filter(in_force, force == "true"))``` legal acts in force at the moment, though a closer examination shows that many of those acts are practically obsolete, even if technically still valid. For example, act ```31952S0004``` is considered in force, but its sole purpose was to set the period for the collection of coal and steel levies in 1953.
+
+Despite this data caveat, it is still interesting to find out how long ago the acts that are currently applicable have entered into force.
+
+## Plot
+
+```{r inforce}
+
+# viz
+in_force |> 
+  filter(force == "true") |> 
+  mutate(days_in_force = as.integer(as.Date(Sys.Date()) - as.Date(date_force)),
+         type = str_sub(celex, 6,6)) |> 
+  filter(type %in% c("R","L","H","D")) |> 
+  mutate(type = case_when(type == "D" ~ "Decision",
+                          type == "H" ~ "Recommendation",
+                          type == "L" ~ "Directive",
+                          type == "R" ~ "Regulation",
+                          T ~ NA_character_)) |> 
+  mutate(months_in_force = days_in_force/12) |> 
+  ggplot(aes(x = days_in_force, fill = type, color = type)) +
+  geom_histogram(bins = 200, show.legend = FALSE) +
+  scale_fill_brewer(palette = "Spectral") +
+  scale_color_brewer(palette = "Spectral") +
+  theme_minimal() +
+  theme(legend.position = "top",
+        legend.justification = "left",
+        legend.title = element_text(face = "italic"),
+        plot.background = element_rect(fill = "white", color = "grey88"),
+        panel.grid = element_line(color = "grey95"),
+        axis.text = element_text(color = "grey10"),
+        title = element_text(face = "bold"),
+        plot.subtitle = element_text(face = "italic"),
+        strip.text = element_text(hjust = 0, face = "bold")) +
+  facet_wrap(~type, scales = "free") +
+  labs(x = NULL,
+       y = NULL,
+       color = NULL,
+       fill = NULL,
+       title = "How old are currently applicable legal acts?",
+       subtitle = "Histogram of the number of days since currently applicable acts entered into force")
+
+```
+
+## Code
+
+```{r inforce, eval=FALSE, echo=TRUE}
+```
+
+## Dataframe
+```{r inforcedf}
+datatable(slice(in_force, 1:1000))
+```
+
+# {-}
+
+We see that the bulk of the currently legally applicable acts have been adopted relatively recently.
+
+At the same time, there is seemingly meaningful variation among the different types of acts. Directives suffer the least from the "recency bias", while the time horizons of regulations and decisions are considerably shorter.
+
+# Legislative efficiency {.tabset}
+
+The image of the EU as an unwieldy bureaucracy with a complicated legislative system appears often in national media. Moreover, most theoretical literature on political systems would expect the number of veto players to affect legislative efficiency. On this basis, we formulate the simple hypothesis that 
+
+> H1: The more EU Member States there are, the longer it takes to pass legislation.
+
+Most people are therefore susceptible to assume that the EU needs a lot of time to adopt legal acts. Let's use Eur-Lex data to find out just how long it normally takes to pass legislation.
+
+## Plot
+
+```{r efficiencyviz}
+
+# calculate maximum length of adoption and discard negative
+acts_days <- acts_proposals |> 
+  filter(!is.na(celex),
+         !is.na(date),
+         !is.na(proposal)) |> 
+  left_join(proposals, by = c("proposal"="celex")) |> 
+  mutate(days = as.integer(as.Date(date) - as.Date(date_proposal))) |> 
+  filter(days > -1) |> 
+  group_by(celex) |> 
+  filter(days == max(days)) |> 
+  ungroup() |> 
+  distinct(celex, .keep_all = TRUE) |> 
+  arrange(date) |> 
+  mutate(year_adopted = as.integer(str_sub(date, 1, 4)),
+         type = str_sub(celex, 6, 6),
+         type = case_when(type == "R" ~ "Regulation",
+                          type == "L" ~ "Directive",
+                          type == "D" ~ "Decision",
+                          T ~ "Other"),
+         five_year = cut_interval(year_adopted, length = 5)) |> 
+  filter(year_adopted > 1985) # not many complete pairs before this
+
+# identify outliers
+outliers <- acts_days |> 
+  group_by(type) |> 
+  mutate(max = max(days),
+         mean = mean(days),
+         coef = days / mean) |> 
+  filter(coef > 2.9) |> 
+  ungroup()
+
+# plot
+acts_days |> 
+  filter(!celex %in% outliers$celex) |> 
+  group_by(type) |> 
+  mutate(global_mean = mean(days)) |> 
+  ggplot(aes(x = five_year, y = days, color = type, fill = type)) +
+  geom_boxplot(alpha = 0.1, show.legend = FALSE) +
+  geom_hline(aes(yintercept = global_mean), lty = 2, color = "grey70") +
+  facet_wrap(~type, dir = "h", ncol = 1, scales = "free_y") +
+  scale_fill_brewer(palette = "Spectral") +
+  scale_color_brewer(palette = "Spectral") +
+  theme_minimal() +
+  theme(legend.position = "top",
+        legend.justification = "left",
+        legend.title = element_text(face = "italic"),
+        plot.background = element_rect(fill = "white", color = "grey88"),
+        panel.grid = element_blank(),
+        axis.text = element_text(color = "grey10"),
+        title = element_text(face = "bold"),
+        plot.subtitle = element_text(face = "italic"),
+        plot.caption = element_text(face = "italic", size = 8),
+        strip.text = element_text(hjust = 0, face = "bold")) +
+  labs(x = NULL,
+       y = "Days to adoption",
+       title = "Number of days between proposal and adoption",
+       subtitle = "By five-year window in which the act was adopted*",
+       caption = "* Outliers are pruned from the analysis, dashed line shows the global mean")
+```
+
+## Code
+
+```{r efficiencyviz, echo=TRUE, eval=FALSE}
+```
+
+## Dataframe
+
+```{r efficiencyvizdf}
+datatable(slice(acts_days, 1:1000))
+```
+
+# {-}
+
+Directives take by far the longest to adopt; unlike decisions and regulations, they are rarely deployed to regulate trivial matters. Nonetheless, there are few easily discernible temporal patterns in the plot. Most of all, it is not obvious that legislative efficiency would decrease as the EU expanded its membership.
+
+However, before moving onto further investigation of the efficiency hypothesis, we should pause and take a look at some of the discarded outliers. What legislation took the longest to adopt?
+
+```{r outliers, fig.width=10, fig.height=8}
+
+# get titles for top outliers
+outliers_top_txt <- outliers |> 
+  arrange(-days) |> 
+  slice(1:75) |> 
+  #rowwise() |> 
+  #mutate(title = elx_fetch_data(paste("http://publications.europa.eu/resource/celex/", celex, sep = ""),
+  #                              "title")) |> 
+  #ungroup() |> 
+  mutate(title = map_chr(paste("http://publications.europa.eu/resource/celex/", celex, sep = ""), possibly(eurlex::elx_fetch_data, otherwise = NA_character_), "title")) |>
+  mutate(title = str_squish(str_remove(title, "\\(?Text with EEA relevance\\)?")))
+
+# interactive plot
+iplot_outliers <- outliers_top_txt |> 
+  bind_rows(data.frame(type = "Recommendation")) |> 
+  ggplot(aes(x = as.Date(date), y = days, color = type, fill = type)) +
+  geom_point_interactive(aes(tooltip = title, data_id = celex), 
+                         alpha = 0.5,
+                         size = 3,
+                         show.legend = FALSE) +
+  geom_hline(yintercept = c(3650,3650*2), lty = 2, color = "grey75") +
+  #annotate(geom = "hline", y = c(3650,3650*2), yintercept = c(3650,3650*2),
+  #         lty = 2, color = "grey75") +
+  annotate(geom = "text", y = c(3650+110,3650*2+110), x = as.Date("2012-01-01"),
+           label = c("10 years", "20 years"),
+           color = "grey50", fontface = "italic") +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Spectral") +
+  scale_color_brewer(palette = "Spectral") +
+  theme_minimal(base_family = "Liberation Sans") +
+  theme(legend.position = "top",
+        legend.justification = "left",
+        legend.title = element_text(face = "italic"),
+        plot.background = element_rect(fill = "white", color = "grey88"),
+        axis.text = element_text(color = "grey10", size = 12),
+        title = element_text(face = "bold", size = 16),
+        panel.grid = element_line(color = "grey94"),
+        axis.title = element_text(hjust = 1, size = 14),
+        plot.subtitle = element_text(face = "italic", size = 15),
+        plot.caption = element_text(face = "italic", size = 9),
+        strip.text = element_text(hjust = 0, face = "bold")) +
+  labs(title = "The most slowly adopted acts in EU history",
+       subtitle = "Number of days between initial Commission proposal and adoption",
+       caption = "Hover over the points to display the title",
+       x = "Date of adoption",
+       y = "Days to adoption")
+
+# render
+girafe(ggobj = iplot_outliers,
+       dependencies = gdtools::liberationsansHtmlDependency(),
+       #fonts = list(sans = "Open Sans"),
+       width_svg = 11,
+       height_svg = 8,
+       options = list(opts_sizing(rescale = TRUE),
+                      opts_toolbar(saveaspng = FALSE),
+                      opts_tooltip(css = "background-color:gray;color:white;font-style:italic;padding:9px;border-radius:5px;font-size:15px;",
+                                   use_fill = TRUE),
+                      opts_hover_inv(css = "opacity:0.1;"),
+                      opts_hover(css = "fill:green;"))
+)
+```
+
+It turns out that many of the slowest legislative processes concerned – and this is particularly visible recently – the conclusion of international agreements. In these situations, the speed does not depend solely on the EU, as an agreement can only be formally concluded once the legal text is successfully negotiated with a third party.
+
+Most acts on the list of slowest legislative files took well over ten years to complete.
+
+## Regression {.tabset}
+
+Regression analysis unpacks the relationship between a response (dependent) variable and one or more explanatory variables. In our case, we are interested in the relationship (or absence thereof) between the number of days it takes the EU to turn a Commission proposal into law and the number of Member States.
+
+We will assume the relationship between the variables is functionally linear. Canonically, the linear model can be written as:
+
+$$
+Y \sim \beta_0 + X\beta_1 + \epsilon
+$$
+
+$$
+\epsilon \sim N(0,\sigma^2)
+$$
+
+where $Y$ is the response variable, $X$ the explanatory variable, $\beta_0$ and $\beta_1$ the unknown parameters of the model and $\epsilon$ the error term which comes from a normal distribution with mean zero.
+
+### Table
+
+```{r regression}
+
+# number of member states over time
+ms_years <- bind_rows(
+  data.frame(
+    year = 1952:1972,
+    n_ms = 6
+  ),
+  data.frame(
+    year = 1973:1980,
+    n_ms = 9
+  ),
+  data.frame(
+    year = 1981:1985,
+    n_ms = 10
+  ),
+  data.frame(
+    year = 1986:1994,
+    n_ms = 12
+  ),
+  data.frame(
+    year = 1995:2004,
+    n_ms = 15
+  ),
+  data.frame(
+    year = 2005:2006,
+    n_ms = 25
+  ),
+  data.frame(
+    year = 2007:2013,
+    n_ms = 27
+  ),
+  data.frame(
+    year = 2014:2018,
+    n_ms = 28
+  ),
+  data.frame(
+    year = 2019:2025,
+    n_ms = 27
+  )
+)
+
+# append N member states
+days_ms <- acts_days |> 
+  left_join(ms_years, by = c("year_adopted"="year")) |> 
+  mutate(type = relevel(as.factor(type), ref = "Other"))
+
+# regress
+models <- list()
+
+## m0
+models[['Baseline']] <- lm(
+  data = days_ms,
+  formula = days ~ n_ms
+)
+names(models[['Baseline']]$coefficients)[1] <- "Constant"
+
+## m1
+models[['Controls']] <- lm(
+  data = days_ms,
+  formula = days ~ n_ms + type
+)
+names(models[['Controls']]$coefficients)[1] <- "Act type = Other"
+
+## m2
+models[['Zero Intercept']] <- lm(
+  data = days_ms,
+  formula = days ~ n_ms + type + 0
+)
+
+# effect size
+effect <- as.numeric(round(models[['Controls']]$coefficients[which(names(models[['Controls']]$coefficients) == "n_ms")],2))
+
+# summary for p values
+mod_sum <- summary(models[['Controls']])
+
+# p value
+p_value <- mod_sum$coefficient[names(mod_sum$coefficient[,1]) == "n_ms", 4]
+
+# p threshold
+p_thresh <- 0.05
+
+# can we reject the null
+reject_null <- ifelse(effect > 0 & p_value < p_thresh, "can reject", "cannot reject")
+
+# show table
+modelsummary(models, 
+             stars = TRUE,
+             coef_map = c("n_ms" = "Number of Member States",
+                          "Constant" = "Constant",
+                          "typeOther" = "Act type = Other",
+                          "Act type = Other" = "Act type = Other",
+                          "typeRegulation" = "Act type = Regulation",
+                          "typeDecision" = "Act type = Decision",
+                          "typeDirective" = "Act type = Directive"),
+             title = "Linear regression model of legislative efficiency (Y_i = days)",
+             notes = list("In the 'Controls' specification, 'Other' is the reference category."))
+```
+
+### Equation
+
+Plugging in the variables and estimated coefficients, the following regression equation predicts the number of days an act would take to pass given some combination of input values:
+
+```{r showequation, results = "asis"}
+extract_eq(models[['Controls']], use_coefs = TRUE)
+```
+
+### Plot
+```{r regviz}
+modelplot(models[['Controls']])
+```
+
+### Code
+```{r regression, echo=TRUE, eval=FALSE}
+```
+
+### Dataframe
+```{r regdf}
+datatable(slice(days_ms, 1:1000))
+```
+
+## {-}
+
+Controlling for the type of act, the linear model predicts that for every additional Member State, the EU takes on average ```r effect``` days longer to adopt the legal act. This effect is ```r ifelse(reject_null == "can reject", "statistically significant", "not statistically significant")``` at ```r p_thresh``` alpha.
+
+This model is far too simple to establish the existence of a causal relationship between the number of Member States and legislative efficiency. Indeed, some scholars would argue that no amount of conditioning on observables is sufficient to establish causality. Moreover, Poisson regression would be more appropriate here as our dependent variable is discrete and bounded at zero.
+
+Nonetheless, our simple analysis suggests that we ```r reject_null``` the null hypothesis that more Member States in the EU system are not associated with slower law-making. 
+
+# Legal bases {.tabset}
+
+Each legal act of the EU needs to have a _legal basis_ in the EU Treaties or in a pre-existing EU law in case of delegated and implementing acts. This is known as the [principle of conferral](https://en.wikipedia.org/wiki/Principle_of_conferral) and essentially represents the EU equivalent of the concept of [enumerated powers](https://en.wikipedia.org/wiki/Enumerated_powers_(United_States)) in the United States.
+
+Data on legal bases can help us better understand the EU legislative output.
+
+```{r lbsdata}
+
+# get legal basis data
+lbs <- elx_make_query("any", sector = 3, include_lbs = TRUE) |> 
+  elx_run_query() |> 
+  select(-work, -lbs) |> 
+  filter(!is.na(celex), !is.na(lbcelex))
+
+# select only EU treaties-based acts
+acts_treaty <- lbs |> 
+  filter(str_detect(lbcelex, "^1.*([:digit:]|[:punct:])$")) |> 
+  distinct(celex)
+
+# lbs enriched
+lbs_enriched <- lbs |> 
+  mutate(delegated = ifelse(celex %in% acts_treaty$celex, "primary", "delegated")) |> 
+  mutate(lbcelex = str_replace(lbcelex, "^1201[:digit:](?=[E|M])", "12008"),
+         lbcelex = str_replace(lbcelex, "^12006(?=[E|M])", "12002")) |> 
+  mutate(act_year = as.integer(str_sub(celex, 2,5)),
+         act_type = str_sub(celex, 6,6),
+         lb_year = as.integer(str_sub(lbcelex, 2,5)),
+         lb_treaty = str_detect(lbcelex, "^1[:digit:]{4}[:upper:][:digit:]{3,}"),
+         lb_type = paste(str_sub(lbcelex,1,1), str_sub(lbcelex,6,6), sep = "_"),
+         dist_year_lb = act_year - lb_year) |> 
+  filter(!str_detect(lbcelex, "^1.*[:upper:]$"))
+
+# most common lbs
+most_common_lbs <- lbs_enriched |> 
+  distinct(celex, lbcelex, .keep_all = TRUE) |> 
+  count(lbcelex) |> 
+  arrange(-n)
+
+# titles of most common lbs
+most_common_lbs10 <- most_common_lbs |> 
+  slice(1:10) |> 
+  mutate(title = map_chr(paste("http://publications.europa.eu/resource/celex/", lbcelex, sep = ""), possibly(eurlex::elx_fetch_data, otherwise = NA_character_), "title"),
+         title = str_squish(str_remove(title, "\\(?Text with EEA relevance\\)?")))
+
+# most common lisbon lbs
+lisbon_lbs_n <- most_common_lbs |> 
+  filter(str_detect(lbcelex, "^12008[E|M][:digit:]")) |> 
+  mutate(art_num = as.integer(str_extract(lbcelex, "(?<=E|M)[:digit:]+")),
+         art_treaty = ifelse(str_detect(lbcelex, "8E"), "TFEU", "TEU"),
+         lb_name = str_c("Article ", art_num, " ", art_treaty)) |> 
+  rename(lb_celex = lbcelex,
+         n_invoked = n) |> 
+  relocate(lb_name, n_invoked, .before = 1)
+```
+
+The most common legal basis historically is `r most_common_lbs10$title[1]`. It has been used as a legal basis on ```r most_common_lbs10$n[1]``` occasions `r if(str_detect(most_common_lbs10$lbcelex[1],"^3")){"and it is a non-treaty legal basis"}`. `r if(str_detect(most_common_lbs10$title[1],"Merger")){"The prevalence of this particular piece of legislation underscores the EU's regulatory role in trying to ensure a competitive playing field in the single market."}` `r if(most_common_lbs10$lbcelex[1] %in% in_force$celex){"It is still in force."} else {"It is no longer in force."}`
+
+Nonetheless, when we think of legal bases, we usually imagine a Treaty competence. Looking exclusively at legal bases in the Treaty on the Functioning of the European Union (TFEU) and Treaty on European Union (TEU), the following table let's you browse the most invoked competences since the entry into force of the Treaty of Lisbon.
+
+```{r lisbonlbsntable}
+datatable(lisbon_lbs_n)
+```
+
+The focus on Treaty competences should not, however, obscure the fact that many EU acts are based on existing legislation rather than directly on a Treaty legal basis.
+
+## Plot
+
+```{r lbsdelegtime}
+
+# df delegated v primary over time
+deleg_prop_time <- lbs_enriched |> 
+  distinct(celex, .keep_all = TRUE) |> 
+  count(act_year, delegated) |> 
+  complete(act_year, delegated, fill = list(n = 0L)) |> 
+  group_by(act_year) |> 
+  mutate(prop = n/sum(n)) |> 
+  ungroup()
+
+# vars for text
+deleg_last_y <- deleg_prop_time |> filter(act_year==year1, delegated == "delegated")
+
+# viz delegated over time
+deleg_prop_time |> 
+  ggplot(aes(x = act_year, y = prop, fill = delegated)) +
+  geom_area(show.legend = TRUE) +
+  geom_vline(xintercept = c(1960,1980,2000,2020), lty = 2, color = "grey70") +
+  geom_hline(yintercept = 0.50, color = "grey50", lty = 3) +
+  scale_fill_viridis_d() +
+  scale_color_viridis_d() +
+  theme_minimal() +
+  theme(legend.position = "top",
+        legend.justification = "left",
+        legend.title = element_text(face = "italic"),
+        plot.background = element_rect(fill = "white", color = "grey88"),
+        panel.grid = element_blank(),
+        axis.text = element_text(color = "grey10"),
+        title = element_text(face = "bold"),
+        plot.subtitle = element_text(face = "italic"),
+        strip.text = element_text(hjust = 0, face = "bold")) +
+  scale_x_continuous(expand = c(0,0)) +
+  scale_y_continuous(expand = c(0,0)) +
+  labs(x = NULL,
+       y = NULL,
+       color = NULL,
+       fill = NULL,
+       title = "Relative prevalence of delegated and primary acts",
+       subtitle = "Proportion of delegated v primary acts in a given year")
+```
+
+## Dataframe
+
+```{r delegproptimedf}
+datatable(deleg_prop_time)
+```
+
+## Code: Data
+
+```{r lbsdata, eval=FALSE, echo=TRUE}
+```
+
+## Code: Plot
+
+```{r lbsdelegtime, eval=FALSE, echo=TRUE}
+```
+
+# {-}
+
+It turns out that most legal acts adopted by the EU have been delegated (and implementing) acts, that is acts based on another piece of legislation rather than one of the EU Treaties (primary acts). Last year, such _delegated_ acts represented ```r round(deleg_last_y$prop,2)*100``` per cent of the EU's yearly legislative output.
+
+# Cite
+
+Cite this document as `r cit_page`.
