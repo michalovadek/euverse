@@ -207,9 +207,9 @@ girafe(ggobj = p_c, width_svg = 9, height_svg = 5)
 # About this page
 
 Source data: [`data-manual/ms-vetoes.csv`](https://github.com/michalovadek/euverse/blob/main/data-manual/ms-vetoes.csv)
-in the [euverse](https://github.com/michalovadek/euverse) repository,
-last refreshed on
-`r format(file.info(veto_csv)$mtime, "%d %B %Y")`.
+in the [euverse](https://github.com/michalovadek/euverse) repository.
+The most recent veto recorded here is from
+**`r format(max(as.Date(veto_data$date_veto)), "%d %B %Y")`**.
 
 Cite as: Ovádek, M. *Tracking EU Member States' Vetoes*. Accessed
 `r format(Sys.Date(), "%d %B %Y")`. Available at
