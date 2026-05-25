@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+title: "euverse: nightly-updated dashboards on European Union institutions"
+message: "If you use these dashboards or any of their underlying snapshots in academic work, please cite them as below."
+type: software
+authors:
+  - family-names: Ovádek
+    given-names: Michal
+    affiliation: "University College London"
+    orcid: "https://orcid.org/0000-0002-2552-2580"
+repository-code: "https://github.com/michalovadek/euverse"
+url: "https://michalovadek.github.io/euverse/"
+keywords:
+  - "European Union"
+  - "EU law"
+  - "Court of Justice of the European Union"
+  - "ECB"
+  - "public dashboards"
+  - "Quarto"
+  - "data visualisation"
+license: "MIT"

@@ -19,10 +19,15 @@ $headings-font-weight: 700 !default;
   padding-bottom: 0.25rem;
 }
 
-// Make freshness callouts slightly less loud than Quarto's defaults.
+// Freshness callouts: muted pastel in light mode; dark-mode override
+// matches the rest of the dark surface so the badge doesn't look like
+// a stuck-on white sticker on a dark page.
 .callout.callout-tip       { border-left-color: #1a7f37 !important; background: #f0fdf4; }
 .callout.callout-warning   { border-left-color: #bf8700 !important; background: #fffaeb; }
 .callout.callout-important { border-left-color: #cf222e !important; background: #fef2f2; }
+[data-bs-theme="dark"] .callout.callout-tip       { background: #102a18 !important; color: #c8f5d6; }
+[data-bs-theme="dark"] .callout.callout-warning   { background: #2d2208 !important; color: #f6e3a6; }
+[data-bs-theme="dark"] .callout.callout-important { background: #2c1010 !important; color: #f9b8b8; }
 
 // Landing-page tracker cards: 2x2 (or 1x4 on mobile), with the whole
 // card clickable via the .stretched-link on the inner <a>.

@@ -198,11 +198,14 @@ girafe(ggobj = p_rates, width_svg = 8.5, height_svg = 4.5)
 In times of rising inflation, the ECB's main countervailing instrument is
 to raise key interest rates.
 
-# Sources
+# About this page
+
+Source data: nightly snapshots in
+[`data-apis/`](https://github.com/michalovadek/euverse/tree/main/data-apis),
+each produced by a fetcher under
+[`R/`](https://github.com/michalovadek/euverse/tree/main/R):
 
 - ECB Data Portal API — [yield curve spot rates](https://data.ecb.europa.eu/data/datasets/YC), [main refinancing rate](https://data.ecb.europa.eu/data/datasets/FM), [HICP year-on-year inflation](https://data.ecb.europa.eu/data/datasets/ICP).
 - Eurostat — long-term gov bond yields, monthly, by country: dataset code `teimf050`.
 
-# Cite
-
-Ovádek, M. *Borrowing and Yields in the European Union*. Accessed `r format(today_d, "%d %B %Y")`. Available at <https://michalovadek.github.io/euverse/trackers/eu-finance.html>.
+Cite as: Ovádek, M. *Borrowing and Yields in the European Union*. Accessed `r format(today_d, "%d %B %Y")`. Available at <https://michalovadek.github.io/euverse/trackers/eu-finance.html>.
