@@ -228,6 +228,23 @@ phase already pinned: `ggplot2`, `ggiraph`, `DT`, `gt`, `here`,
 `jsonlite`, `arrow`, `viridis`, `RColorBrewer`, `digest`, `htmltools`,
 `yaml`. The rest get pinned as tracker ports need them.
 
+## 9b. Tests
+
+`tests/test_helpers.R` is the smoke-test suite for the helpers in `R/`.
+Plain base-R (no testthat dependency) so it runs from a stock R install
+in ~5 seconds. CI runs it BEFORE the fetch stage — if `celex_*` or
+`write_snapshot()` are broken, we want to know before burning 10
+minutes on SPARQL queries that the page can't render anyway.
+
+To run locally:
+
+```powershell
+& "C:\Program Files\R\R-4.4.3\bin\Rscript.exe" tests/test_helpers.R
+```
+
+Exit 0 = pass, exit 1 = first failure halts. Add a test for each new
+helper function as you write it.
+
 ## 10. Open questions / TODOs
 
 - [x] Bootswatch base + colour palette decided 2026-05-23: zephyr (light) /
