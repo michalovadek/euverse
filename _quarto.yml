@@ -20,6 +20,13 @@ website:
   twitter-card:
     creator: "@MichalOvadek"
     image: assets/og-image.svg
+  # Lets readers flag mistakes in the data interpretation or the qmd
+  # directly via GitHub. "issue" links open a new issue prefilled with
+  # the page URL so triaging is easy.
+  repo-url: https://github.com/michalovadek/euverse
+  repo-actions: [issue, source]
+  back-to-top-navigation: true
+  page-navigation: true
   navbar:
     left:
       - href: home.qmd
