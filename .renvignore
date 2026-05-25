@@ -11,3 +11,5 @@ old/
 _site/
 _freeze/
 .quarto/
+.scratch*.R
+.scratch_*.R

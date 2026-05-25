@@ -42,7 +42,18 @@ theme_mo <- function(base_size = 12) {
       plot.background      = ggplot2::element_rect(fill = "white", colour = NA),
       strip.text           = ggplot2::element_text(face = "bold"),
       legend.position      = "bottom",
-      legend.title         = ggplot2::element_blank()
+      legend.title         = ggplot2::element_blank(),
+      # Axis tick + text spacing: 4 pt ticks plus an explicit 6-pt right
+      # margin on y-axis text keeps categorical labels (rapporteurs,
+      # veto issues, country names) from sitting flush against the panel
+      # edge. Same idea for x-axis date ticks.
+      axis.ticks.length    = ggplot2::unit(4, "pt"),
+      axis.text.y          = ggplot2::element_text(margin = ggplot2::margin(r = 6)),
+      axis.text.x          = ggplot2::element_text(margin = ggplot2::margin(t = 4)),
+      # Outer chart margin: room on the right so x-axis terminal tick
+      # labels (e.g. final year "2026") don't get cut off when the chart
+      # is rendered at the page's right edge.
+      plot.margin          = ggplot2::margin(t = 6, r = 16, b = 6, l = 6)
     )
 }
 

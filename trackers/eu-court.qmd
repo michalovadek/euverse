@@ -309,7 +309,7 @@ The most important cases at the CJ are decided by more than ten judges
 in the Grand Chamber; on special occasions, the CJ even sits as the
 Full Court. Most cases are decided by a panel of five judges.
 
-```{r rapporteurs, echo=FALSE, fig.height=6, fig.width=9}
+```{r rapporteurs, echo=FALSE, fig.height=9, fig.width=9}
 top_rapps <- decisions |>
   filter(clx_court %in% c("C", "T"),
          procedure_class != "Other",
@@ -338,7 +338,11 @@ p_rapp <- ggplot(rapp_dat,
   geom_col_interactive(aes(tooltip = tooltip, data_id = data_id),
                        colour = "grey96", position = "stack", show.legend = TRUE) +
   scale_fill_manual(values = mo_palette$categorical[c(1, 2, 5, 3)]) +
-  facet_wrap(~ court_long, dir = "v", scales = "free") +
+  # Stack panels vertically: with 17+-char surnames ("Silva de Lapuerta",
+  # "Moitinho de Almeida") the side-by-side layout crams labels into ~78 px
+  # of y-axis space per panel. ncol = 1 gives each panel the full chart
+  # width and lets ggplot auto-allocate enough label space.
+  facet_wrap(~ court_long, ncol = 1, scales = "free") +
   labs(x = NULL, y = NULL,
        title = "Most frequent judge-rapporteurs",
        subtitle = "Judgments in the four main procedure types only",
@@ -346,7 +350,7 @@ p_rapp <- ggplot(rapp_dat,
   theme_mo() +
   theme(strip.text = element_text(hjust = 0, face = "bold"))
 
-girafe(ggobj = p_rapp, width_svg = 9, height_svg = 6)
+girafe(ggobj = p_rapp, width_svg = 9, height_svg = 9)
 ```
 
 Each decision is assigned a judge-rapporteur. This judge has the

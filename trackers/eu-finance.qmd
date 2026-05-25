@@ -184,15 +184,14 @@ p_rates <- ggplot(rates_long,
   geom_hline(yintercept = 0, colour = "grey80") +
   geom_hline(yintercept = 2, colour = "grey50", linetype = 2) +
   geom_step_interactive(linewidth = 0.35, show.legend = FALSE) +
-  annotate("text", x = as.Date("1998-11-01"), y = 2.4,
-           label = "2% inflation target", size = 2.6, colour = "grey40") +
   scale_y_continuous(labels = function(x) paste0(x, "%")) +
   scale_colour_manual(values = mo_palette$categorical[c(2, 6)]) +
   ggforce::facet_zoom(x = between(date, today_d - 365, today_d),
                       horizontal = FALSE, zoom.size = 0.5) +
   labs(x = NULL, y = "Rate",
        title = "Key interest rate and inflation",
-       subtitle = "ECB main refinancing operations rate and Euro Area HICP year-on-year change") +
+       subtitle = "ECB main refinancing operations rate and Euro Area HICP year-on-year change",
+       caption = "Dashed grey line marks the ECB's 2% inflation target.") +
   theme_mo()
 
 girafe(ggobj = p_rates, width_svg = 8.5, height_svg = 4.5)

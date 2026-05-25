@@ -206,7 +206,8 @@ p_c <- ggplot(df_c, aes(x = n, y = reorder(issue, sum))) +
   ggiraph::scale_fill_brewer_interactive(palette = "Paired", type = "qual") +
   scale_x_continuous(expand = c(0, 0.15)) +
   theme_mo() +
-  theme(axis.text.y = element_text(hjust = 1)) +
+  # margin(r=6) keeps issue labels from sitting flush against the panel.
+  theme(axis.text.y = element_text(hjust = 1, margin = margin(r = 6))) +
   labs(x = NULL, y = NULL,
        title = "Veto issues and third countries",
        subtitle = "Number of times a veto related to an issue",

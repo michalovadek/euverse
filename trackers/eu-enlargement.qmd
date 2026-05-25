@@ -184,7 +184,14 @@ enlargement pipeline.
 cand_plot <- candidates |>
   filter(!is.na(candidate_year)) |>
   mutate(end   = year_now,
-         label = paste0(country, " (", iso2, ")")) |>
+         # Short name for the y-axis label so "Bosnia and Herzegovina"
+         # doesn't crowd the left margin. Full country name and status
+         # date live in the tooltip already.
+         label = case_when(
+           country == "Bosnia and Herzegovina" ~ "Bosnia & Herz. (BA)",
+           country == "North Macedonia"        ~ "N. Macedonia (MK)",
+           TRUE                                ~ paste0(country, " (", iso2, ")")
+         )) |>
   arrange(desc(candidate_year), country) |>
   mutate(label = factor(label, levels = label))
 
