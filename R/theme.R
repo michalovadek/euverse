@@ -46,6 +46,14 @@ theme_mo <- function(base_size = 12) {
     )
 }
 
+mono <- function(x) {
+  # Wrap a computed value in <code> so inline R expressions render in
+  # backtick style. Use in qmd as:  `r mono(format(n_acts, big.mark = ','))`
+  # to get the value styled like Markdown inline code (monospace, slight
+  # background tint, more distinct from prose than plain <strong>).
+  htmltools::HTML(paste0("<code>", as.character(x), "</code>"))
+}
+
 register_ggiraph_defaults <- function() {
   ggiraph::set_girafe_defaults(
     opts_hover = ggiraph::opts_hover(

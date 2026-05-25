@@ -16,6 +16,8 @@ source(here::here("R", "freshness.R"))
 source(here::here("R", "table.R"))
 register_ggiraph_defaults()
 
+fmt_n <- function(x) format(x, big.mark = ",")
+
 # Load the manual data.
 veto_csv <- here::here("data-manual", "ms-vetoes.csv")
 veto_data <- read.csv(veto_csv, sep = ";", fileEncoding = "UTF-8-BOM") |>
@@ -57,9 +59,9 @@ opposing a measure under a procedure requiring unanimous agreement of all
 Member States.^[I count every reported instance of a veto being used, even
 if the same or similar issue already attracted a veto in the past.]
 
-Since `r start_date`, there have been `r n_vetoes` vetoes by `r n_states`
-Member States across `r n_issues` issues. This page is updated whenever
-a new veto is reported.
+Since `r start_date`, there have been `r mono(fmt_n(n_vetoes))` vetoes by
+`r mono(n_states)` Member States across `r mono(n_issues)` issues. This
+page is updated whenever a new veto is reported.
 
 ```{r freshness, results='asis', echo=FALSE}
 freshness_badge(veto_meta)

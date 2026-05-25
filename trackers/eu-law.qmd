@@ -21,6 +21,8 @@ source(here::here("R", "table.R"))
 source(here::here("R", "celex.R"))
 register_ggiraph_defaults()
 
+fmt_n <- function(x) format(x, big.mark = ",")
+
 # Load 4 snapshots + shared eu_member_states.
 acts_meta       <- read_with_freshness("eurlex_acts")
 force_meta      <- read_with_freshness("eurlex_acts_force")
@@ -62,10 +64,10 @@ of the EU's legislative output and efficiency, sourced from
 or mistakes in Eur-Lex carry through to the output shown here.]
 
 As of `r format(today_d, "%d %B %Y")`, the EU and its predecessors have
-produced **`r format(n_regs, big.mark = ',')`** regulations,
-**`r format(n_dirs, big.mark = ',')`** directives,
-**`r format(n_decs, big.mark = ',')`** decisions, and
-**`r format(n_recs, big.mark = ',')`** recommendations.
+produced `r mono(fmt_n(n_regs))` regulations,
+`r mono(fmt_n(n_dirs))` directives,
+`r mono(fmt_n(n_decs))` decisions, and
+`r mono(fmt_n(n_recs))` recommendations.
 
 ```{r freshness, results='asis', echo=FALSE}
 freshness_badge_combined(list(acts_meta$meta, force_meta$meta, proposals_meta$meta, lbs_meta$meta))
@@ -202,7 +204,7 @@ girafe(ggobj = p_yoy, width_svg = 9, height_svg = 4)
 # Acts in force
 
 Not all legal acts remain in force indefinitely. According to Eur-Lex, the
-EU has **`r format(sum(acts_force$force == 'true'), big.mark = ',')`** acts
+EU has `r mono(fmt_n(sum(acts_force$force == 'true')))` acts
 in force at the moment.
 
 ```{r in-force, echo=FALSE, fig.height=4, fig.width=9}
@@ -335,7 +337,7 @@ top_lb_name <- most_common_lbs$title[1]
 top_lb_n    <- most_common_lbs$n[1]
 ```
 
-The most-invoked legal basis historically is *`r if (is.na(top_lb_name)) most_common_lbs$lbcelex[1] else top_lb_name`*, used as a legal basis on **`r format(top_lb_n, big.mark = ',')`** occasions.
+The most-invoked legal basis historically is *`r if (is.na(top_lb_name)) most_common_lbs$lbcelex[1] else top_lb_name`*, used as a legal basis on `r mono(fmt_n(top_lb_n))` occasions.
 
 ```{r lbs-table, echo=FALSE}
 most_common_lbs |>

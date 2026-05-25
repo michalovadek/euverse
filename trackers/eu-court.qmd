@@ -20,6 +20,8 @@ source(here::here("R", "freshness.R"))
 source(here::here("R", "table.R"))
 register_ggiraph_defaults()
 
+fmt_n <- function(x) format(x, big.mark = ",")
+
 # Load snapshots once at the top.
 cc  <- read_with_freshness("curia_cases")
 ed  <- read_with_freshness("eurlex_court_decisions")
@@ -75,11 +77,11 @@ a reasonable approximation of the true state of the world. The
 more comprehensive datasets.]
 
 As of `r format(today_d, "%d %B %Y")`, EU courts have delivered
-`r format(n_decisions, big.mark = ",")` decisions in about
-`r format(n_cases, big.mark = ",")` cases submitted to them since 1953.
-According to public records, **`r n_pending_cj`** cases are currently
-pending before the Court of Justice and **`r n_pending_gc`** before the
-General Court.
+`r mono(fmt_n(n_decisions))` decisions in about
+`r mono(fmt_n(n_cases))` cases submitted to them since 1953.
+According to public records, `r mono(fmt_n(n_pending_cj))` cases are
+currently pending before the Court of Justice and
+`r mono(fmt_n(n_pending_gc))` before the General Court.
 
 ```{r freshness, results='asis', echo=FALSE}
 freshness_badge_combined(list(cc$meta, ed$meta))
@@ -103,7 +105,7 @@ Even more than any other branch of the EU, the CJEU's caseload changed
 dramatically over the course of European integration. We can visualise
 the annual caseload of the three EU courts since 1953.
 
-```{r ncasesyearcourt, echo=FALSE, fig.height=6, fig.width=9}
+```{r ncasesyearcourt, echo=FALSE, fig.height=8, fig.width=9}
 n_cases_year_court <- curia_cases |>
   filter(!is.na(court), !is.na(case_year)) |>
   summarise(n = n_distinct(case_id), .by = c(court, case_year)) |>
@@ -126,7 +128,7 @@ p_caseload <- ggplot(n_cases_year_court,
   scale_fill_identity() +
   scale_colour_identity() +
   scale_x_continuous(breaks = seq(1950, year_now + 1, by = 10)) +
-  facet_wrap(~ court_long, scales = "free_y", dir = "v") +
+  facet_wrap(~ court_long, scales = "free_y", ncol = 1) +
   labs(x = NULL, y = NULL,
        title = "Number of cases received by EU courts",
        subtitle = "Aggregated by year and court",
@@ -134,7 +136,7 @@ p_caseload <- ggplot(n_cases_year_court,
   theme_mo() +
   theme(strip.text = element_text(hjust = 0, face = "bold"))
 
-girafe(ggobj = p_caseload, width_svg = 9, height_svg = 6)
+girafe(ggobj = p_caseload, width_svg = 9, height_svg = 8)
 ```
 
 The increase in the CJ's and GC's caseloads was mostly gradual.
@@ -377,16 +379,72 @@ refs_map_dat <- ggplot2::map_data("world",
   mutate(region = ifelse(region == "Czech Republic", "Czechia", region),
          region = ifelse(region == "UK", "United Kingdom", region))
 
+# Country centroids for label overlay. Hardcoded because the map data
+# is polygon outlines, not centroids — and the small countries (MT,
+# CY, LU) are otherwise unfindable on a Europe-scale map. Each row
+# carries the ISO-2 code shown over the country and the full name for
+# the tooltip + map join key.
+eu_centroids <- tibble::tribble(
+  ~origin,          ~iso2,  ~lon,   ~lat,
+  "Austria",         "AT",  14.5,   47.5,
+  "Belgium",         "BE",   4.5,   50.6,
+  "Bulgaria",        "BG",  25.5,   42.7,
+  "Croatia",         "HR",  15.8,   45.3,
+  "Cyprus",          "CY",  33.2,   35.0,
+  "Czechia",         "CZ",  15.5,   49.7,
+  "Denmark",         "DK",   9.5,   56.0,
+  "Estonia",         "EE",  25.5,   58.6,
+  "Finland",         "FI",  26.0,   64.5,
+  "France",          "FR",   2.5,   46.5,
+  "Germany",         "DE",  10.5,   51.0,
+  "Greece",          "GR",  22.0,   39.0,
+  "Hungary",         "HU",  19.5,   47.0,
+  "Ireland",         "IE",  -8.0,   53.0,
+  "Italy",           "IT",  12.5,   42.5,
+  "Latvia",          "LV",  24.6,   56.9,
+  "Lithuania",       "LT",  23.9,   55.3,
+  "Luxembourg",      "LU",   6.1,   49.8,
+  "Malta",           "MT",  14.5,   35.9,
+  "Netherlands",     "NL",   5.5,   52.2,
+  "Poland",          "PL",  19.5,   52.0,
+  "Portugal",        "PT",  -8.0,   39.5,
+  "Romania",         "RO",  25.0,   45.8,
+  "Slovakia",        "SK",  19.5,   48.7,
+  "Slovenia",        "SI",  14.5,   46.1,
+  "Spain",           "ES",  -3.7,   40.0,
+  "Sweden",          "SE",  16.0,   62.0,
+  "United Kingdom",  "GB",  -2.0,   53.0
+) |>
+  left_join(n_refs_country |> select(origin, n_refs), by = "origin") |>
+  mutate(label_tooltip = paste0(origin, ": ",
+                                ifelse(is.na(n_refs), "0", format(n_refs, big.mark = ",")),
+                                " preliminary references"))
+
 p_map <- ggplot(n_refs_country) +
   geom_map_interactive(
     aes(map_id = origin, fill = n_refs, tooltip = tooltip, data_id = origin),
-    map = refs_map_dat, colour = "grey28", size = 0.2, show.legend = FALSE
+    map = refs_map_dat, colour = "grey60", linewidth = 0.2, show.legend = FALSE
+  ) +
+  # Country code labels at each centroid so small states (MT, CY, LU)
+  # are findable. White text on dark border so it stays readable across
+  # the viridis fill range.
+  ggiraph::geom_text_interactive(
+    data = eu_centroids,
+    aes(x = lon, y = lat, label = iso2,
+        tooltip = label_tooltip, data_id = origin),
+    colour = "#ffffff", fontface = "bold", size = 2.8,
+    inherit.aes = FALSE
   ) +
   expand_limits(x = c(-13.66, 38.55), y = c(34.5, 71.05)) +
-  scale_fill_gradientn(colours = mo_palette$sequential(9)) +
+  # coord_quickmap fixes the lat/lon aspect ratio without needing the
+  # mapproj package (which would be a new renv pin). It picks a sensible
+  # constant scaling from the lat midpoint, so countries are not stretched
+  # horizontally as in the unprojected default.
+  coord_quickmap() +
+  scale_fill_gradientn(colours = mo_palette$sequential(9), na.value = "grey85") +
   labs(x = NULL, y = NULL,
        title = "Preliminary references by country of origin",
-       subtitle = "Total number of closed cases referred by national courts") +
+       subtitle = "Total number of closed cases referred by national courts (ISO-2 country codes shown)") +
   theme_mo() +
   theme(panel.grid = element_blank(),
         axis.text  = element_blank())

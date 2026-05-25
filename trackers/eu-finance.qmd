@@ -18,6 +18,8 @@ source(here::here("R", "theme.R"))
 source(here::here("R", "freshness.R"))
 register_ggiraph_defaults()
 
+fmt_n <- function(x) format(x, big.mark = ",")
+
 # Load all four snapshots once at the top of the page.
 yc  <- read_with_freshness("ecb_yield_curve")
 eus <- read_with_freshness("eurostat_teimf050")
@@ -139,11 +141,12 @@ girafe(ggobj = p_country, width_svg = 9, height_svg = 7)
 As most EU borrowing happens at the national level, yields vary
 systematically by country as well as over time. At the moment the highest
 yields are on bonds issued by **`r cur_max_yld$country_name`** at
-**`r round(cur_max_yld$yield_pct, 2)`%**; the lowest are on
-**`r cur_min_yld$country_name`** at **`r round(cur_min_yld$yield_pct, 2)`%**.
+`r mono(paste0(round(cur_max_yld$yield_pct, 2), "%"))`; the lowest are on
+**`r cur_min_yld$country_name`** at
+`r mono(paste0(round(cur_min_yld$yield_pct, 2), "%"))`.
 Over the last twelve months, the Euro Area aggregate yield averaged
-**`r ea_recent$mean`%**, while EU members outside the euro averaged
-**`r non_ea_recent$mean`%**. The simplistic comparison is confounded by
+`r mono(paste0(ea_recent$mean, "%"))`, while EU members outside the euro
+averaged `r mono(paste0(non_ea_recent$mean, "%"))`. The simplistic comparison is confounded by
 uneven group composition (macroeconomic stability, debt loads), but
 comparing matched pairs across the divide — e.g. Czechia vs. Slovakia, or
 Finland vs. Sweden — can be instructive.

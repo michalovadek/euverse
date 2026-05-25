@@ -19,6 +19,8 @@ source(here::here("R", "freshness.R"))
 source(here::here("R", "table.R"))
 register_ggiraph_defaults()
 
+fmt_n <- function(x) format(x, big.mark = ",")
+
 ms_csv  <- here::here("data-manual", "eu-member-states.csv")
 ms_meta <- manual_meta(ms_csv, source_label = "data-manual/eu-member-states.csv (hand-curated)")
 
@@ -78,7 +80,7 @@ ms_long_wave <- ms_long |>
 
 The European Economic Community started life in 1957 with six members.
 By 2020 it had become the European Union of 27 — having passed through
-**`r length(unique(ms_wave$wave))`** distinct enlargement waves and one
+`r mono(length(unique(ms_wave$wave)))` distinct enlargement waves and one
 withdrawal. This page traces that history from the source data the rest
 of the euverse trackers depend on: the small hand-curated master file
 listing every Member State's accession year and (where applicable) exit
@@ -167,10 +169,12 @@ ms_wave |>
 # Candidate and potential-candidate countries
 
 The chart and table above only show **current and historical Member
-States**. As of `r format(today_d, "%B %Y")`, **`r sum(candidates$status == "candidate")`**
-countries hold formal candidate status and **`r sum(candidates$status == "potential candidate")`**
-hold potential-candidate status. Together they describe the EU's
-current enlargement pipeline.
+States**. As of `r format(today_d, "%B %Y")`,
+`r mono(sum(candidates$status == "candidate"))` countries hold formal
+candidate status and
+`r mono(sum(candidates$status == "potential candidate"))` hold
+potential-candidate status. Together they describe the EU's current
+enlargement pipeline.
 
 ```{r candidates-timeline, echo=FALSE, fig.height=4.5, fig.width=9}
 # Chart shows only countries with a candidate_year (i.e. excludes

@@ -93,7 +93,7 @@ card <- function(href, title, blurb, fact, fact_date) {
     '<div class="tracker-card">',
     '<a href="', esc(href), '" class="stretched-link"><h3>', esc(title), '</h3></a>',
     '<p class="tracker-blurb">', esc(blurb), '</p>',
-    '<div class="tracker-fact"><strong>', esc(fact), '</strong>',
+    '<div class="tracker-fact"><code>', esc(fact), '</code>',
     '<span class="tracker-date"> &mdash; latest as of ', esc(fact_date), '</span></div>',
     '</div>'
   )

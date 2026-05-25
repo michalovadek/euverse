@@ -2,7 +2,7 @@
 # Sourced from .qmd pages via:  source(here::here("R", "table.R"))
 # Owner: see AGENTS.md §6.
 
-dt_mo <- function(df, ..., page_length = 15) {
+dt_mo <- function(df, ..., page_length = 10) {
   DT::datatable(
     df,
     rownames   = FALSE,
