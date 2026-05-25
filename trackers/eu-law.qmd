@@ -18,6 +18,7 @@ suppressPackageStartupMessages({
 source(here::here("R", "theme.R"))
 source(here::here("R", "freshness.R"))
 source(here::here("R", "table.R"))
+source(here::here("R", "celex.R"))
 register_ggiraph_defaults()
 
 # Load 4 snapshots + shared eu_member_states.
@@ -195,14 +196,8 @@ in force at the moment.
 in_force_clean <- acts_force |>
   filter(force == "true") |>
   mutate(days_in_force = as.integer(as.Date(today_d) - as.Date(date_force)),
-         type = case_when(
-           str_sub(celex, 6, 6) == "R" ~ "Regulation",
-           str_sub(celex, 6, 6) == "L" ~ "Directive",
-           str_sub(celex, 6, 6) == "D" ~ "Decision",
-           str_sub(celex, 6, 6) == "H" ~ "Recommendation",
-           TRUE                        ~ NA_character_
-         )) |>
-  filter(!is.na(type))
+         type = celex_act_type(celex)) |>
+  filter(type != "Other")
 
 p_inforce <- ggplot(in_force_clean,
                     aes(x = days_in_force, fill = type)) +

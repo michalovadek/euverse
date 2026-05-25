@@ -2,12 +2,11 @@
 # Source: Eur-Lex SPARQL "proposal" type query.
 
 suppressPackageStartupMessages({
-  library(arrow); library(jsonlite); library(here); library(digest)
-  library(eurlex); library(dplyr)
+  library(here); library(eurlex); library(dplyr)
 })
+source(here::here("R", "freshness.R"))
 
-src     <- "eurlex_proposals"
-out_dir <- here::here("data-apis")
+src <- "eurlex_proposals"
 
 df <- tryCatch({
   elx_make_query("proposal", include_date = TRUE) |>
@@ -31,15 +30,4 @@ if (!all(c("celex", "date_proposal") %in% names(df))) {
   quit(status = 1L)
 }
 
-data_tmp <- tempfile(tmpdir = out_dir, fileext = ".parquet")
-meta_tmp <- tempfile(tmpdir = out_dir, fileext = ".json")
-arrow::write_parquet(df, data_tmp, compression = "zstd")
-jsonlite::write_json(
-  list(source = src,
-       fetched_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
-       rows = nrow(df),
-       schema_hash = digest::digest(names(df), algo = "sha256")),
-  meta_tmp, auto_unbox = TRUE, pretty = TRUE)
-file.rename(data_tmp, file.path(out_dir, paste0(src, "_latest.parquet")))
-file.rename(meta_tmp, file.path(out_dir, paste0(src, "_latest.meta.json")))
-message("Wrote ", src, " latest snapshot: ", nrow(df), " rows.")
+write_snapshot(df, src)

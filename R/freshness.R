@@ -77,6 +77,33 @@ freshness_badge_combined <- function(metas) {
   freshness_badge(oldest_meta)
 }
 
+write_snapshot <- function(df, src,
+                           out_dir = here::here("data-apis")) {
+  # Atomic counterpart to read_with_freshness(). Every R/fetch_*.R ends with
+  # this: write parquet + meta sidecar to a tempfile, then file.rename into
+  # place so a half-written run never leaves the live snapshot in an
+  # inconsistent state. Returns the path to the data file (for tests).
+  data_tmp  <- tempfile(tmpdir = out_dir, fileext = ".parquet")
+  meta_tmp  <- tempfile(tmpdir = out_dir, fileext = ".json")
+  data_path <- file.path(out_dir, paste0(src, "_latest.parquet"))
+  meta_path <- file.path(out_dir, paste0(src, "_latest.meta.json"))
+
+  arrow::write_parquet(df, data_tmp, compression = "zstd")
+  jsonlite::write_json(
+    list(
+      source      = src,
+      fetched_at  = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
+      rows        = nrow(df),
+      schema_hash = digest::digest(names(df), algo = "sha256")
+    ),
+    meta_tmp, auto_unbox = TRUE, pretty = TRUE
+  )
+  file.rename(data_tmp, data_path)
+  file.rename(meta_tmp, meta_path)
+  message("Wrote ", src, " latest snapshot: ", nrow(df), " rows.")
+  invisible(data_path)
+}
+
 manual_meta <- function(path, source_label = basename(path)) {
   # Build a freshness-badge-shaped meta from a hand-curated file's mtime.
   # Pages that consume manual data use this in place of the

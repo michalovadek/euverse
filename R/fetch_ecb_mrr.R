@@ -3,11 +3,11 @@
 # Event-driven series — one observation per rate change. Goes back to 1998.
 
 suppressPackageStartupMessages({
-  library(arrow); library(jsonlite); library(here); library(digest)
+  library(here)
 })
+source(here::here("R", "freshness.R"))
 
-src     <- "ecb_mrr"
-out_dir <- here::here("data-apis")
+src <- "ecb_mrr"
 
 # ---- 1. fetch ---------------------------------------------------------------
 df <- tryCatch({
@@ -41,18 +41,4 @@ if (!all(c("date", "rate_pct") %in% names(df))) {
 }
 
 # ---- 3. write atomically ----------------------------------------------------
-data_tmp <- tempfile(tmpdir = out_dir, fileext = ".parquet")
-meta_tmp <- tempfile(tmpdir = out_dir, fileext = ".json")
-arrow::write_parquet(df, data_tmp, compression = "zstd")
-jsonlite::write_json(
-  list(
-    source      = src,
-    fetched_at  = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
-    rows        = nrow(df),
-    schema_hash = digest::digest(names(df), algo = "sha256")
-  ),
-  meta_tmp, auto_unbox = TRUE, pretty = TRUE
-)
-file.rename(data_tmp, file.path(out_dir, paste0(src, "_latest.parquet")))
-file.rename(meta_tmp, file.path(out_dir, paste0(src, "_latest.meta.json")))
-message("Wrote ", src, " latest snapshot: ", nrow(df), " rows.")
+write_snapshot(df, src)

@@ -4,9 +4,10 @@
 # Cleaning derived from old/eucourtstats.Rmd lines 482-664.
 
 suppressPackageStartupMessages({
-  library(arrow); library(jsonlite); library(here); library(digest)
-  library(eurlex); library(dplyr); library(tidyr); library(stringr); library(purrr)
+  library(here); library(eurlex); library(dplyr); library(tidyr); library(stringr); library(purrr)
 })
+source(here::here("R", "freshness.R"))
+source(here::here("R", "celex.R"))
 
 src     <- "eurlex_court_decisions"
 out_dir <- here::here("data-apis")
@@ -28,8 +29,8 @@ df <- tryCatch({
   decisions <- raw |>
     mutate(clx_type  = str_sub(celex, 6, 7),
            clx_num   = as.integer(str_sub(celex, 8, 11)),
-           clx_year  = as.integer(str_sub(celex, 2, 5)),
-           clx_court = str_sub(celex, 6, 6),
+           clx_year  = celex_year(celex),
+           clx_court = celex_court(celex),
            dec_type  = case_when(
              clx_type %in% c("CJ", "TJ", "FJ")             ~ "Judgment",
              clx_type %in% c("CO", "CB", "TO", "TB", "FO", "FB") ~ "Order",
@@ -64,8 +65,8 @@ df <- tryCatch({
   decisions <- decisions |>
     mutate(clx_type  = str_sub(celex, 6, 7),
            clx_num   = as.integer(str_sub(celex, 8, 11)),
-           clx_year  = as.integer(str_sub(celex, 2, 5)),
-           clx_court = str_sub(celex, 6, 6),
+           clx_year  = celex_year(celex),
+           clx_court = celex_court(celex),
            clx_dec   = str_sub(celex, 7, 7)) |>
     group_by(clx_court, clx_year, clx_num) |>
     mutate(dupl = any(clx_dec %in% "B") & any(clx_dec %in% "O")) |>
@@ -225,18 +226,4 @@ if (!all(required_cols %in% names(df))) {
 }
 
 # ---- 4. write atomically ----------------------------------------------------
-data_tmp <- tempfile(tmpdir = out_dir, fileext = ".parquet")
-meta_tmp <- tempfile(tmpdir = out_dir, fileext = ".json")
-arrow::write_parquet(df, data_tmp, compression = "zstd")
-jsonlite::write_json(
-  list(
-    source      = src,
-    fetched_at  = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
-    rows        = nrow(df),
-    schema_hash = digest::digest(names(df), algo = "sha256")
-  ),
-  meta_tmp, auto_unbox = TRUE, pretty = TRUE
-)
-file.rename(data_tmp, file.path(out_dir, paste0(src, "_latest.parquet")))
-file.rename(meta_tmp, file.path(out_dir, paste0(src, "_latest.meta.json")))
-message("Wrote ", src, " latest snapshot: ", nrow(df), " rows.")
+write_snapshot(df, src, out_dir)

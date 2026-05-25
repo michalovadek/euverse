@@ -4,12 +4,12 @@
 # eu-law page's "most recent legislation" table works from the snapshot.
 
 suppressPackageStartupMessages({
-  library(arrow); library(jsonlite); library(here); library(digest)
-  library(eurlex); library(dplyr); library(stringr); library(purrr)
+  library(here); library(eurlex); library(dplyr); library(stringr); library(purrr)
 })
+source(here::here("R", "freshness.R"))
+source(here::here("R", "celex.R"))
 
-src     <- "eurlex_acts"
-out_dir <- here::here("data-apis")
+src <- "eurlex_acts"
 
 df <- tryCatch({
   raw <- elx_make_query("any", sector = 3,
@@ -23,14 +23,8 @@ df <- tryCatch({
     filter(!is.na(celex), !date %in% c("1003-03-03")) |>
     distinct(celex, .keep_all = TRUE) |>
     mutate(
-      type = case_when(
-        str_sub(celex, 6, 6) == "R" ~ "Regulation",
-        str_sub(celex, 6, 6) == "L" ~ "Directive",
-        str_sub(celex, 6, 6) == "D" ~ "Decision",
-        str_sub(celex, 6, 6) == "H" ~ "Recommendation",
-        TRUE                        ~ "Other"
-      ),
-      year = as.integer(str_sub(celex, 2, 5))
+      type = celex_act_type(celex),
+      year = celex_year(celex)
     )
 
   # Title-fetch for top-50 newest acts of the 4 main types.
@@ -64,15 +58,4 @@ if (!all(c("celex", "date", "type", "year", "recent_title") %in% names(df))) {
   quit(status = 1L)
 }
 
-data_tmp <- tempfile(tmpdir = out_dir, fileext = ".parquet")
-meta_tmp <- tempfile(tmpdir = out_dir, fileext = ".json")
-arrow::write_parquet(df, data_tmp, compression = "zstd")
-jsonlite::write_json(
-  list(source = src,
-       fetched_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
-       rows = nrow(df),
-       schema_hash = digest::digest(names(df), algo = "sha256")),
-  meta_tmp, auto_unbox = TRUE, pretty = TRUE)
-file.rename(data_tmp, file.path(out_dir, paste0(src, "_latest.parquet")))
-file.rename(meta_tmp, file.path(out_dir, paste0(src, "_latest.meta.json")))
-message("Wrote ", src, " latest snapshot: ", nrow(df), " rows.")
+write_snapshot(df, src)

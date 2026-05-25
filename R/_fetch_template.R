@@ -21,19 +21,17 @@
 # ============================================================================
 
 suppressPackageStartupMessages({
-  library(arrow)
-  library(jsonlite)
   library(here)
-  library(digest)
+  # Add domain libraries (dplyr, eurlex, eurostat, ...) here as needed.
 })
+source(here::here("R", "freshness.R"))   # provides write_snapshot()
 
-src     <- "REPLACE_ME"                       # e.g. "ecb_yields"
-out_dir <- here::here("data-apis")
+src <- "REPLACE_ME"                      # e.g. "ecb_yields"
 
 # ---- 1. fetch ---------------------------------------------------------------
 df <- tryCatch({
   # ... real fetch logic goes here ...
-  stop("fetcher not yet implemented")        # remove once the body is written
+  stop("fetcher not yet implemented")    # remove once the body is written
   data.frame()
 }, error = function(e) {
   message("Fetch failed: ", conditionMessage(e))
@@ -48,22 +46,4 @@ if (!is.data.frame(df) || nrow(df) == 0L) {
 # ... domain-specific schema checks here; quit(1L) on any failure ...
 
 # ---- 3. write atomically ----------------------------------------------------
-data_tmp <- tempfile(tmpdir = out_dir, fileext = ".parquet")
-meta_tmp <- tempfile(tmpdir = out_dir, fileext = ".json")
-
-arrow::write_parquet(df, data_tmp, compression = "zstd")
-jsonlite::write_json(
-  list(
-    source      = src,
-    fetched_at  = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
-    rows        = nrow(df),
-    schema_hash = digest::digest(names(df), algo = "sha256")
-  ),
-  meta_tmp,
-  auto_unbox = TRUE,
-  pretty     = TRUE
-)
-
-file.rename(data_tmp, file.path(out_dir, paste0(src, "_latest.parquet")))
-file.rename(meta_tmp, file.path(out_dir, paste0(src, "_latest.meta.json")))
-message("Wrote ", src, " latest snapshot: ", nrow(df), " rows.")
+write_snapshot(df, src)
