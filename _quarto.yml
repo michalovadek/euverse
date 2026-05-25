@@ -24,6 +24,8 @@ website:
             text: EU Vetoes
           - href: trackers/eu-court.qmd
             text: EU Court
+          - href: trackers/eu-law.qmd
+            text: EU Law
 
 format:
   html:

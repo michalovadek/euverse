@@ -45,10 +45,21 @@ jobs:
           r-version: '4.4.3'
           use-public-rspm: true
 
+      # System libs for compiled R packages. Each entry is the apt pkg required
+      # by an R dep listed in renv.lock (verified against rstudio/r-system-requirements).
+      # Add to this list whenever a new R package with a sysreq enters the lockfile.
+      - name: Install system dependencies (Ubuntu)
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends \
+            libpoppler-cpp-dev \
+            libqpdf-dev \
+            antiword \
+            libgdal-dev \
+            libgeos-dev \
+            libproj-dev
+
       # Caches based on hash of renv.lock; runs renv::restore() automatically.
-      # When we add packages that need system libs (cairo, poppler, etc.),
-      # insert `r-lib/actions/setup-r-dependencies@v2` BEFORE this step so the
-      # system packages get installed from DESCRIPTION/renv.lock.
       - name: Restore renv
         uses: r-lib/actions/setup-renv@v2
 

@@ -166,24 +166,19 @@ typical tracker data and avoids the >50 MB warnings.
     R): each fetcher runs in its own `Rscript` invocation; a non-zero
     exit emits a GitHub Actions `::warning::` annotation but does NOT
     fail the job.
-  - When we add R packages needing system libs (cairo, poppler, freetype,
-    libudunits, …), insert `r-lib/actions/setup-r-dependencies@v2` BEFORE
-    `setup-renv` and it will install them from DESCRIPTION/renv.lock.
+  - System libs for compiled R packages are installed via an explicit
+    `apt-get install` step **before** `setup-renv`. Each entry maps to a
+    package in `renv.lock` (libpoppler-cpp-dev=pdftools, libqpdf-dev=qpdf,
+    antiword=antiword, libgdal/geos/proj-dev=maps/sf). When adding a new
+    R package with a sysreq, append to that list. Alternative: switch to
+    `r-lib/actions/setup-r-dependencies@v2` (which derives sysreqs from
+    DESCRIPTION/renv.lock automatically) — see TODO §10.
 
-### Going live (greenfield — no cut-over dance)
+### Live site
 
-The deploy job in `render.yml` is gated `if: false` until the owner is
-ready to publish. To go live:
-
-1. GitHub repo Settings → **Pages → Source → "GitHub Actions"** (one-time).
-2. Change `if: false` → `if: true` (or remove the line) in
-   `.github/workflows/render.yml`.
-3. Push. The next workflow run deploys to
-   `https://michalovadek.github.io/euverse/`.
-
-Unlike the original (mistaken) attempt in `michalovadek.github.io`, this
-repo is greenfield — there is no existing static HTML to coexist with or
-rename around. The first deployed render IS the site.
+Site goes live at `https://michalovadek.github.io/euverse/` automatically
+on every successful render+deploy. Pages source = "GitHub Actions" was
+set on 2026-05-24. First live deploy: commit `c62b1eb` (eu-vetoes port).
 
 ## 8. Git, gitignore, and GitHub size limits
 
@@ -214,7 +209,7 @@ Therefore:
 |----------------------------------------------------|--------------------|---------------------------|------------------------------|
 | `old/tracker.qmd` ✅ ported 2026-05-24             | Quarto + Action    | `trackers/eu-vetoes.qmd`  | `data-manual/ms-vetoes.csv` (already here) |
 | `old/eucourtstats.Rmd` ✅ ported 2026-05-25        | Rmd + nightly cron | `trackers/eu-court.qmd`   | `data-apis/eurlex_*`         |
-| `old/eulawstats.Rmd`                               | Rmd + nightly cron | `trackers/eu-law.qmd`     | `data-apis/eurlex_*`         |
+| `old/eulawstats.Rmd` ✅ ported 2026-05-25          | Rmd + nightly cron | `trackers/eu-law.qmd`     | `data-apis/eurlex_*`         |
 | `old/eufinancestats.Rmd` ✅ ported 2026-05-24      | Rmd + nightly cron | `trackers/eu-finance.qmd` | `data-apis/ecb_*, eurostat_*`|
 
 Old standalone repos (`eu-veto-tracker`, `eucourt`, `eulaw`, `eufinance`)
