@@ -31,12 +31,17 @@ veto_data <- veto_data |>
   mutate(id_issue = cur_group_id(), .after = 1) |>
   ungroup()
 
-# Freshness meta from CSV mtime, with row count filled in after filter.
-veto_meta <- manual_meta(
-  veto_csv,
-  source_label = "data-manual/ms-vetoes.csv (hand-curated)"
+# Freshness meta: use the date of the LATEST reported veto rather than
+# the CSV's mtime. CI checkout resets file mtimes to the run time, so
+# mtime would show "fresh" every nightly render even if nobody added a
+# new veto in months — misleading. The most-recent veto date is the
+# honest signal for "is this dataset current?".
+latest_veto_date <- max(as.Date(veto_data$date_veto), na.rm = TRUE)
+veto_meta <- list(
+  source     = "data-manual/ms-vetoes.csv (hand-curated)",
+  fetched_at = format(as.POSIXct(latest_veto_date), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"),
+  rows       = nrow(veto_data)
 )
-veto_meta$rows <- nrow(veto_data)
 
 # Inline-prose stats.
 start_date <- format(min(as.Date(veto_data$date_veto)), "%d %B %Y")
