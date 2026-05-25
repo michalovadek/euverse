@@ -80,6 +80,13 @@ jobs:
         with:
           version: '1.7.17'
 
+      # Smoke tests for the shared R helpers. Run before the fetch + render
+      # stages so a breaking change in R/celex.R or R/freshness.R fails the
+      # workflow IMMEDIATELY (~5 seconds) rather than wasting 5-10 minutes
+      # on fetchers/renders only to surface the same bug downstream.
+      - name: Run helper smoke tests
+        run: Rscript tests/test_helpers.R
+
       # Graceful degradation: each fetcher under R/fetch_*.R is run in
       # isolation. A failure writes a GH Actions WARNING annotation but does
       # NOT fail the workflow — the qmd pages must fall back to the previous
