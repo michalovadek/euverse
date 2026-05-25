@@ -173,9 +173,13 @@ hold potential-candidate status. Together they describe the EU's
 current enlargement pipeline.
 
 ```{r candidates-timeline, echo=FALSE, fig.height=4.5, fig.width=9}
+# Chart shows only countries with a candidate_year (i.e. excludes
+# Kosovo, which has applied but has no formal candidate status yet;
+# Kosovo still appears in the table below). Sort by accession-status
+# year, descending — newest aspirants at the top.
 cand_plot <- candidates |>
-  mutate(start = candidate_year,
-         end   = year_now,
+  filter(!is.na(candidate_year)) |>
+  mutate(end   = year_now,
          label = paste0(country, " (", iso2, ")")) |>
   arrange(desc(candidate_year), country) |>
   mutate(label = factor(label, levels = label))
@@ -188,10 +192,10 @@ p_cand <- ggplot(cand_plot,
                                              paste0(", negotiations from ",
                                                     negotiations_year))),
                      data_id = iso2)) +
-  geom_segment_interactive(aes(x = start, xend = end, yend = label,
+  geom_segment_interactive(aes(x = candidate_year, xend = end, yend = label,
                                colour = status),
                            linewidth = 4, lineend = "round") +
-  geom_point_interactive(aes(x = negotiations_year, yend = label),
+  geom_point_interactive(aes(x = negotiations_year),
                          size = 3, shape = 21, fill = "white",
                          colour = "grey30",
                          na.rm = TRUE) +
@@ -202,7 +206,7 @@ p_cand <- ggplot(cand_plot,
        title = "Current EU enlargement pipeline",
        subtitle = "Bar runs from candidate-status year; ring marks year accession negotiations opened",
        colour = NULL,
-       caption = "Türkiye: negotiations opened 2005 but effectively frozen since 2018.") +
+       caption = "Türkiye: negotiations opened 2005 but effectively frozen since 2018. Kosovo applied 2022 but is not yet a candidate (table below).") +
   theme_mo() +
   theme(panel.grid.major.y = element_blank())
 
