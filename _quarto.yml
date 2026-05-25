@@ -11,7 +11,10 @@ project:
 website:
   title: "euverse"
   site-url: "https://michalovadek.github.io/euverse"
+  favicon: assets/favicon.svg
   open-graph: true
+  twitter-card:
+    creator: "@MichalOvadek"
   navbar:
     left:
       - href: home.qmd
