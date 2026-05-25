@@ -42,14 +42,24 @@ latest_veto <- vetoes_df |>
 veto_fact <- sprintf("%s vetoes recorded since 2011", nrow(vetoes_df))
 veto_date <- format(as.Date(latest_veto$date_veto), "%B %Y")
 
-# ---- EU Court: number of cases this year + decisions this year --------------
+# ---- EU Court: number of cases in the latest fully-populated year -----------
+# Use the latest year that actually has cases rather than the calendar
+# year — by early in a calendar year Curia hasn't yet listed any cases
+# for it, so showing "0 new cases in <year>" would be misleading. The
+# eu-court tracker page itself shows the calendar-year forecast.
 cases <- read_with_freshness("curia_cases")
 year_now <- as.integer(format(Sys.Date(), "%Y"))
-n_this_year <- cases$data |>
-  filter(case_year == year_now) |>
+latest_court_year <- cases$data |>
+  filter(!is.na(case_year)) |>
+  pull(case_year) |>
+  max()
+n_latest_year <- cases$data |>
+  filter(case_year == latest_court_year) |>
   nrow()
-court_fact <- sprintf("%s new cases lodged in %s", format(n_this_year, big.mark = ","), year_now)
-court_date <- format(Sys.Date(), "%B %Y")
+court_fact <- sprintf("%s new cases lodged in %s",
+                      format(n_latest_year, big.mark = ","),
+                      latest_court_year)
+court_date <- as.character(latest_court_year)
 
 # ---- EU Law: total acts + most recent date ----------------------------------
 acts <- read_with_freshness("eurlex_acts")
@@ -72,21 +82,20 @@ last_event <- max(c(ms_enl$accession_year, ms_enl$exit_year), na.rm = TRUE)
 enl_fact <- sprintf("%s current Member States", n_current_ms)
 enl_date <- as.character(last_event)
 
-# Build one tracker card.
+# Build one tracker card as a single un-indented HTML string. We use raw
+# sprintf rather than htmltools::div() because htmltools indents nested
+# children by 2 spaces and Pandoc's markdown reader treats indented HTML
+# blocks as code, wrapping the rendered card content in <pre><code> on
+# the live site. Single-line output dodges that entirely.
 card <- function(href, title, blurb, fact, fact_date) {
-  htmltools::div(
-    class = "tracker-card",
-    htmltools::tags$a(
-      href = href, class = "stretched-link",
-      htmltools::h3(title)
-    ),
-    htmltools::p(blurb, class = "tracker-blurb"),
-    htmltools::div(
-      class = "tracker-fact",
-      htmltools::strong(fact),
-      htmltools::tags$span(class = "tracker-date",
-                           paste0(" — latest as of ", fact_date))
-    )
+  esc <- htmltools::htmlEscape
+  paste0(
+    '<div class="tracker-card">',
+    '<a href="', esc(href), '" class="stretched-link"><h3>', esc(title), '</h3></a>',
+    '<p class="tracker-blurb">', esc(blurb), '</p>',
+    '<div class="tracker-fact"><strong>', esc(fact), '</strong>',
+    '<span class="tracker-date"> &mdash; latest as of ', esc(fact_date), '</span></div>',
+    '</div>'
   )
 }
 ```
@@ -100,38 +109,24 @@ is the chart the data supports today.
 ::: {.tracker-grid}
 
 ```{r cards, echo=FALSE, results='asis'}
-htmltools::tagList(
-  card(
-    "trackers/eu-finance.html",
-    "EU Finance",
-    "Bond yields, inflation, and the ECB's key rate, plotted against the post-2008 sovereign-debt back-history.",
-    fin_fact, fin_date
-  ),
-  card(
-    "trackers/eu-vetoes.html",
-    "EU Vetoes",
-    "Every Member State veto on a Council file since 2010, hand-curated from the public record.",
-    veto_fact, veto_date
-  ),
-  card(
-    "trackers/eu-court.html",
-    "EU Court",
-    "Caseload, procedure types, rapporteur productivity, and country-of-origin maps for the CJEU.",
-    court_fact, court_date
-  ),
-  card(
-    "trackers/eu-law.html",
-    "EU Law",
-    "Regulations, directives, decisions, and recommendations adopted by the EU since 1952 — plus how long they took to pass.",
-    law_fact, law_date
-  ),
-  card(
-    "trackers/eu-enlargement.html",
-    "EU Enlargement",
-    "Membership of the EU from the Founding Six in 1957 to today, traced wave by wave (and the one withdrawal).",
-    enl_fact, sprintf("last accession/exit in %s", enl_date)
-  )
-) |> htmltools::tagList() |> as.character() |> cat()
+cat(
+  card("trackers/eu-finance.html", "EU Finance",
+       "Bond yields, inflation, and the ECB's key rate, plotted against the post-2008 sovereign-debt back-history.",
+       fin_fact, fin_date),
+  card("trackers/eu-vetoes.html", "EU Vetoes",
+       "Every Member State veto on a Council file since 2010, hand-curated from the public record.",
+       veto_fact, veto_date),
+  card("trackers/eu-court.html", "EU Court",
+       "Caseload, procedure types, rapporteur productivity, and country-of-origin maps for the CJEU.",
+       court_fact, court_date),
+  card("trackers/eu-law.html", "EU Law",
+       "Regulations, directives, decisions, and recommendations adopted by the EU since 1952 — plus how long they took to pass.",
+       law_fact, law_date),
+  card("trackers/eu-enlargement.html", "EU Enlargement",
+       "Membership of the EU from the Founding Six in 1957 to today, traced wave by wave (and the one withdrawal).",
+       enl_fact, sprintf("last accession/exit in %s", enl_date)),
+  sep = "\n"
+)
 ```
 
 :::
