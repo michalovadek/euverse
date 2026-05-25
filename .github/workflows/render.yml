@@ -135,3 +135,49 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  # ----------------------------------------------------------------------------
+  # VERIFY — fetch the live site after deploy and confirm each tracker URL
+  # returns 200 and contains an expected content marker. Catches silent
+  # post-deploy regressions (Pages CDN cache stuck, redirect loop, page
+  # rendered but missing data, etc.) before a reader notices.
+  # ----------------------------------------------------------------------------
+  verify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Pages CDN to settle
+        run: sleep 30
+      - name: Probe live URLs
+        shell: bash
+        run: |
+          set -euo pipefail
+          declare -A urls=(
+            ["https://michalovadek.github.io/euverse/home.html"]="tracker-card"
+            ["https://michalovadek.github.io/euverse/data.html"]="Data downloads"
+            ["https://michalovadek.github.io/euverse/trackers/eu-finance.html"]="Data as of"
+            ["https://michalovadek.github.io/euverse/trackers/eu-vetoes.html"]="Data as of"
+            ["https://michalovadek.github.io/euverse/trackers/eu-court.html"]="Data as of"
+            ["https://michalovadek.github.io/euverse/trackers/eu-law.html"]="Data as of"
+            ["https://michalovadek.github.io/euverse/trackers/eu-enlargement.html"]="Data as of"
+          )
+          fail=0
+          for url in "${!urls[@]}"; do
+            marker="${urls[$url]}"
+            # Up to 3 tries with 15-s backoff in case the CDN edge is still
+            # serving the prior render right after deploy.
+            for attempt in 1 2 3; do
+              status=$(curl -sSL -o body.html -w "%{http_code}" "$url" || true)
+              if [ "$status" = "200" ] && grep -q "$marker" body.html; then
+                echo "::notice::OK ($attempt) $url"
+                break
+              fi
+              if [ "$attempt" = 3 ]; then
+                echo "::error::$url status=$status marker_missing=$([ "$status" = "200" ] && echo "yes" || echo "n/a")"
+                fail=1
+              else
+                sleep 15
+              fi
+            done
+          done
+          exit "$fail"

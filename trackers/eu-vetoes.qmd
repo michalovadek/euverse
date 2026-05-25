@@ -204,10 +204,16 @@ p_c <- ggplot(df_c, aes(x = n, y = reorder(issue, sum))) +
                            data_id = id),
                        show.legend = FALSE) +
   ggiraph::scale_fill_brewer_interactive(palette = "Paired", type = "qual") +
-  scale_x_continuous(expand = c(0, 0.15)) +
+  # Add a small left-side data padding so bars don't start flush against
+  # the y-axis labels; visually separates the label column from the bars.
+  scale_x_continuous(expand = expansion(mult = c(0.04, 0.04))) +
   theme_mo() +
-  # margin(r=6) keeps issue labels from sitting flush against the panel.
-  theme(axis.text.y = element_text(hjust = 1, margin = margin(r = 6))) +
+  # Smaller, right-aligned y labels with explicit tick padding. The
+  # element_text margin alone wasn't shifting positions in ggiraph's
+  # SVG; combining with a smaller text size makes the label column
+  # visibly less cramped.
+  theme(axis.text.y      = element_text(hjust = 1, size = 9),
+        axis.ticks.length = unit(4, "pt")) +
   labs(x = NULL, y = NULL,
        title = "Veto issues and third countries",
        subtitle = "Number of times a veto related to an issue",
