@@ -59,7 +59,8 @@ euverse/
 │   ├── eu-vetoes.qmd         # from old/tracker.qmd          (data-manual)
 │   ├── eu-court.qmd          # from old/eucourtstats.Rmd     (data-apis)
 │   ├── eu-law.qmd            # from old/eulawstats.Rmd       (data-apis)
-│   └── eu-finance.qmd        # from old/eufinancestats.Rmd   (data-apis)
+│   ├── eu-finance.qmd        # from old/eufinancestats.Rmd   (data-apis)
+│   └── eu-enlargement.qmd    # net-new 2026-05-25, no standalone predecessor
 ├── R/                        # shared R helpers (flat scripts, file per concern)
 │   ├── theme.R               # ggplot theme + ggiraph defaults + colour palette
 │   ├── table.R               # shared DT / gt wrappers
@@ -211,6 +212,7 @@ Therefore:
 | `old/eucourtstats.Rmd` ✅ ported 2026-05-25        | Rmd + nightly cron | `trackers/eu-court.qmd`   | `data-apis/eurlex_*`         |
 | `old/eulawstats.Rmd` ✅ ported 2026-05-25          | Rmd + nightly cron | `trackers/eu-law.qmd`     | `data-apis/eurlex_*`         |
 | `old/eufinancestats.Rmd` ✅ ported 2026-05-24      | Rmd + nightly cron | `trackers/eu-finance.qmd` | `data-apis/ecb_*, eurostat_*`|
+| _(no predecessor)_ 🆕 added 2026-05-25             | n/a                | `trackers/eu-enlargement.qmd` | `data-final/eu_member_states.parquet` |
 
 Old standalone repos (`eu-veto-tracker`, `eucourt`, `eulaw`, `eufinance`)
 stay live (their `gh-pages` branches keep serving) until each new tracker

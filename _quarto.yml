@@ -29,6 +29,8 @@ website:
             text: EU Court
           - href: trackers/eu-law.qmd
             text: EU Law
+          - href: trackers/eu-enlargement.qmd
+            text: EU Enlargement
 
 format:
   html:

@@ -65,6 +65,13 @@ law_recent_date <- acts$data |>
   max(na.rm = TRUE)
 law_date <- format(law_recent_date, "%B %Y")
 
+# ---- EU Enlargement: current MS count + year of latest event ----------------
+ms_enl <- arrow::read_parquet(here::here("data-final", "eu_member_states.parquet"))
+n_current_ms <- ms_enl |> filter(is.na(exit_year)) |> nrow()
+last_event <- max(c(ms_enl$accession_year, ms_enl$exit_year), na.rm = TRUE)
+enl_fact <- sprintf("%s current Member States", n_current_ms)
+enl_date <- as.character(last_event)
+
 # Build one tracker card.
 card <- function(href, title, blurb, fact, fact_date) {
   htmltools::div(
@@ -86,7 +93,7 @@ card <- function(href, title, blurb, fact, fact_date) {
 
 The European Union generates an extraordinary amount of public data — court
 rulings, vetoes, legal acts, financial indicators. Most of it lives behind
-unfriendly APIs and PDF archives. This site pulls four such streams into
+unfriendly APIs and PDF archives. This site pulls those streams into
 plain-language dashboards that re-render every night, so the chart you see
 is the chart the data supports today.
 
@@ -117,6 +124,12 @@ htmltools::tagList(
     "EU Law",
     "Regulations, directives, decisions, and recommendations adopted by the EU since 1952 — plus how long they took to pass.",
     law_fact, law_date
+  ),
+  card(
+    "trackers/eu-enlargement.html",
+    "EU Enlargement",
+    "Membership of the EU from the Founding Six in 1957 to today, traced wave by wave (and the one withdrawal).",
+    enl_fact, sprintf("last accession/exit in %s", enl_date)
   )
 ) |> htmltools::tagList() |> as.character() |> cat()
 ```
