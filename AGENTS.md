@@ -250,8 +250,12 @@ helper function as you write it.
 - [x] Bootswatch base + colour palette decided 2026-05-23: zephyr (light) /
       darkly (dark), Inter font, Okabe-Ito categorical, viridis sequential,
       BrBG diverging. See `docs/specs/2026-05-23-shared-infra-design.md` §3.1.
-- [ ] Real landing page content for `home.qmd` (or rename to `index.qmd`
-      and design a proper landing). Currently it's a plumbing test only.
+- [x] Real landing page content for `home.qmd` done 2026-05-25
+      (5-card responsive grid with live "latest fact" per tracker).
+- [ ] Future-content backlog lives in
+      `docs/specs/2026-05-25-future-content-suggestions.md`. Five
+      tracker ideas + five infra improvements. Pick the highest-payoff
+      one next time you have a quiet week.
 - [ ] Backfill `_SOURCE.md` sidecars in `data-external/euplex/`, `euprops/`,
       `manifesto/`, `parlgov/` when each is first consumed by a tracker.
 - [ ] CNAME? (owner has no custom domain at time of writing — site URL
