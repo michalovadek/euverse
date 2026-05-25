@@ -1,0 +1,7 @@
+{
+  "source": "eu-member-states",
+  "built_at": "2026-05-24T23:41:51Z",
+  "inputs": "data-manual/eu-member-states.csv",
+  "builder_script": "R/build_eu_member_states.R",
+  "rows": 28
+}

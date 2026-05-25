@@ -213,7 +213,7 @@ Therefore:
 | Old artifact (under `old/` or sibling repo)        | Original build     | New location              | Data path                    |
 |----------------------------------------------------|--------------------|---------------------------|------------------------------|
 | `old/tracker.qmd` ✅ ported 2026-05-24             | Quarto + Action    | `trackers/eu-vetoes.qmd`  | `data-manual/ms-vetoes.csv` (already here) |
-| `old/eucourtstats.Rmd`                             | Rmd + nightly cron | `trackers/eu-court.qmd`   | `data-apis/eurlex_*`         |
+| `old/eucourtstats.Rmd` ✅ ported 2026-05-25        | Rmd + nightly cron | `trackers/eu-court.qmd`   | `data-apis/eurlex_*`         |
 | `old/eulawstats.Rmd`                               | Rmd + nightly cron | `trackers/eu-law.qmd`     | `data-apis/eurlex_*`         |
 | `old/eufinancestats.Rmd` ✅ ported 2026-05-24      | Rmd + nightly cron | `trackers/eu-finance.qmd` | `data-apis/ecb_*, eurostat_*`|
 
@@ -242,5 +242,14 @@ phase already pinned: `ggplot2`, `ggiraph`, `DT`, `gt`, `here`,
       `manifesto/`, `parlgov/` when each is first consumed by a tracker.
 - [ ] CNAME? (owner has no custom domain at time of writing — site URL
       remains `https://michalovadek.github.io/euverse/`.)
+- [ ] **Upstream bug in `eurlex::elx_curia_parse`** discovered 2026-05-25:
+      `extract_first` helper drops `match.length` attribute when
+      subsetting an integer match-position vector, breaking
+      `regmatches` with "invalid substring arguments". Reproduces in
+      eurlex 0.4.9 (currently pinned in `renv.lock` from GitHub
+      `michalovadek/eurlex@<sha>`). Workaround in
+      `R/fetch_curia_cases.R`: use `parse = FALSE` + extract ECLI
+      manually; see_case/appeal cols set to NA. Fix in package +
+      re-enable `parse = TRUE` in the fetcher.
 - [ ] Long-term: extract `R/fetch_eurlex.R` into the `eurlex` package
       itself (owner already maintains it) so other projects benefit.

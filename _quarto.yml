@@ -22,6 +22,8 @@ website:
             text: EU Finance
           - href: trackers/eu-vetoes.qmd
             text: EU Vetoes
+          - href: trackers/eu-court.qmd
+            text: EU Court
 
 format:
   html:
