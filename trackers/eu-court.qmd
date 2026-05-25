@@ -359,9 +359,10 @@ references <- decisions |>
   filter(!is.na(origin), origin != "")
 
 n_refs_country <- references |>
+  filter(!is.na(clx_year)) |>
   arrange(date) |>
   group_by(origin) |>
-  summarise(year_first = min(clx_year, na.rm = TRUE),
+  summarise(year_first = min(clx_year),
             n_refs     = n(), .groups = "drop") |>
   mutate(tooltip = paste0(origin, ": ", n_refs, " references. First case referred in ", year_first, "."))
 

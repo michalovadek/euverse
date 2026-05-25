@@ -83,15 +83,19 @@ which has historically been predictive of recessions.
 country_data <- eus$data |>
   filter(!geo %in% c("EA", "EU27_2020"))
 
-# Latest observation per country, then rank for max/min prose.
+# Latest observation per country, then rank for max/min prose. We must
+# drop NAs BEFORE slice_min/max — those functions return zero-row
+# results if the value column is all-NA in a group, which then crashes
+# the inline R expressions further down with NULL$country_name.
 cur_latest <- country_data |>
+  filter(!is.na(yield_pct)) |>
   arrange(desc(date)) |>
   group_by(country_name) |>
   slice(1) |>
   ungroup()
 
-cur_max_yld <- cur_latest |> slice_max(yield_pct, n = 1)
-cur_min_yld <- cur_latest |> slice_min(yield_pct, n = 1)
+cur_max_yld <- cur_latest |> slice_max(yield_pct, n = 1, with_ties = FALSE)
+cur_min_yld <- cur_latest |> slice_min(yield_pct, n = 1, with_ties = FALSE)
 
 # Euro Area average (last 12 months) and non-euro EU-member average.
 ea_recent <- eus$data |>
@@ -171,7 +175,8 @@ rates_long <- bind_rows(mrr_daily, hic_daily) |> filter(!is.na(value))
 p_rates <- ggplot(rates_long,
                   aes(x = date, y = value,
                       colour = series,
-                      tooltip = series,
+                      tooltip = paste0(series, ": ", round(value, 2), "% (",
+                                       format(date, "%Y-%m"), ")"),
                       data_id = series)) +
   geom_hline(yintercept = 0, colour = "grey80") +
   geom_hline(yintercept = 2, colour = "grey50", linetype = 2) +
