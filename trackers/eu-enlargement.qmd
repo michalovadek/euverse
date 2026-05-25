@@ -99,9 +99,9 @@ ggplot(ms_long_wave, aes(x = year, y = n_ms, fill = wave)) +
   scale_x_continuous(expand = c(0, 0), breaks = seq(1950, year_now, 10)) +
   scale_y_continuous(expand = c(0, 0), breaks = c(6, 9, 10, 12, 15, 25, 27, 28),
                      limits = c(0, 30)) +
-  labs(x = NULL, y = "Number of Member States",
+  labs(x = NULL, y = NULL,
        title = "EU membership over time",
-       subtitle = "Stacked by accession wave; the dip in 2020 is Brexit",
+       subtitle = "Number of Member States, stacked by accession wave; the dip in 2020 is Brexit",
        fill = NULL) +
   theme_mo() +
   theme(legend.position = "bottom",
@@ -239,17 +239,8 @@ candidates |>
   dt_mo()
 ```
 
-# About this page
+# Cite
 
-Source: [`data-manual/eu-member-states.csv`](https://github.com/michalovadek/euverse/blob/main/data-manual/eu-member-states.csv),
-a hand-curated list of every state that has ever held EU membership,
-with its accession year and (where applicable) exit year. Built into
-[`data-final/eu_member_states.parquet`](https://github.com/michalovadek/euverse/blob/main/data-final/eu_member_states.parquet)
-by [`R/build_eu_member_states.R`](https://github.com/michalovadek/euverse/blob/main/R/build_eu_member_states.R).
-The same parquet is consumed by the
-[EU Court](eu-court.html) and [EU Law](eu-law.html) trackers for their
-member-state-count time-series.
-
-Cite as: Ovádek, M. *Enlargement of the European Union*. Accessed
+Ovádek, M. *Enlargement of the European Union*. Accessed
 `r format(Sys.Date(), "%d %B %Y")`. Available at
 <https://michalovadek.github.io/euverse/trackers/eu-enlargement.html>.

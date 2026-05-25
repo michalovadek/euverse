@@ -3,7 +3,6 @@ project:
   output-dir: _site
   render:
     - home.qmd
-    - data.qmd
     - "trackers/*.qmd"
     - "!old/**"
   resources:
@@ -31,8 +30,6 @@ website:
     left:
       - href: home.qmd
         text: Home
-      - href: data.qmd
-        text: Data
       - text: Trackers
         menu:
           - href: trackers/eu-finance.qmd

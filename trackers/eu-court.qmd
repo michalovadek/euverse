@@ -156,7 +156,15 @@ and next year's CJ caseload.
 
 The model uses lags 1, 2 and 3 of CJ caseload plus a 3-year lag of GC
 caseload (since CJ caseload is linked to GC's through appeal
-procedures).
+procedures):
+
+$$
+Y_{t}^{CJ} = \beta_0 + \beta_1 Y_{t-1}^{CJ} + \beta_2 Y_{t-2}^{CJ} + \beta_3 Y_{t-3}^{CJ} + \beta_4 Y_{t-3}^{GC} + \epsilon_t
+$$
+
+The parameters are estimated via Gaussian or Poisson regression.^[Because
+we are working with count data, Poisson regression should be in principle
+more appropriate.]
 
 ```{r forecast, echo=FALSE, fig.height=4, fig.width=9}
 dat_reg <- n_cases_year_court |>
@@ -194,19 +202,24 @@ plot_dat <- n_cases_year_court |>
   filter(case_year > year_now - 7, court == "CJ") |>
   mutate(tooltip = paste0("N = ", n), data_id = paste0("actual", case_year))
 
+cj_color <- court_palette$color[court_palette$court == "CJ"]
+
 p_forecast <- ggplot(plot_dat, aes(x = case_year, y = n)) +
-  geom_col(data = tibble(case_year = year_now, n = yhat_ols),
-           colour = court_palette$color[court_palette$court == "CJ"],
-           fill   = court_palette$color[court_palette$court == "CJ"],
-           alpha = 0.15, lty = 2) +
+  # Forecast bars BEHIND the actual bars. alpha 0.4 + linewidth 0.6
+  # makes the predicted bars clearly visible (was 0.15, barely showed).
+  geom_col_interactive(
+    data = tibble(case_year = year_now, n = yhat_ols,
+                  tooltip = paste0("Forecast for ", year_now, " = ", yhat_ols),
+                  data_id = paste0("pred", year_now)),
+    aes(tooltip = tooltip, data_id = data_id),
+    colour = cj_color, fill = cj_color, alpha = 0.4, lty = 2, linewidth = 0.6
+  ) +
   geom_col_interactive(
     data = tibble(case_year = year_now + 1, n = yhat_ols_t1,
-                  tooltip = paste0("Predicted N = ", yhat_ols_t1),
+                  tooltip = paste0("Forecast for ", year_now + 1, " = ", yhat_ols_t1),
                   data_id = paste0("pred", year_now + 1)),
     aes(tooltip = tooltip, data_id = data_id),
-    colour = court_palette$color[court_palette$court == "CJ"],
-    fill   = court_palette$color[court_palette$court == "CJ"],
-    alpha = 0.15, lty = 2
+    colour = cj_color, fill = cj_color, alpha = 0.4, lty = 2, linewidth = 0.6
   ) +
   geom_col_interactive(aes(fill = color, tooltip = tooltip, data_id = data_id)) +
   scale_fill_identity() +
@@ -214,7 +227,7 @@ p_forecast <- ggplot(plot_dat, aes(x = case_year, y = n)) +
   labs(x = NULL, y = NULL,
        title = "Number of cases received by the Court of Justice",
        subtitle = "Forecast for the current and next year",
-       caption = "Predictions shown as dashed-outline bars") +
+       caption = "Predicted years shown with dashed border + lighter fill") +
   theme_mo()
 
 girafe(ggobj = p_forecast, width_svg = 9, height_svg = 4)
@@ -450,7 +463,7 @@ p_map <- ggplot(n_refs_country) +
   scale_fill_gradientn(colours = mo_palette$sequential(9), na.value = "grey85") +
   labs(x = NULL, y = NULL,
        title = "Preliminary references by country of origin",
-       subtitle = "Total number of closed cases referred by national courts (ISO-2 country codes shown)") +
+       subtitle = "Total number of closed cases referred by national courts") +
   theme_mo() +
   theme(panel.grid = element_blank(),
         axis.text  = element_blank())
@@ -502,23 +515,8 @@ and its preliminary-ruling procedure gained prominence. Note that the
 data here comes from _closed_ cases only — many recent referrals are
 still pending.
 
-# About this page
+# Cite
 
-Source data:
-
-- [`R/fetch_curia_cases.R`](https://github.com/michalovadek/euverse/blob/main/R/fetch_curia_cases.R)
-  scrapes the Curia case list via the `eurlex` package; snapshot at
-  [`data-apis/curia_cases_latest.parquet`](https://github.com/michalovadek/euverse/blob/main/data-apis/curia_cases_latest.parquet).
-- [`R/fetch_eurlex_court_decisions.R`](https://github.com/michalovadek/euverse/blob/main/R/fetch_eurlex_court_decisions.R)
-  queries Eur-Lex's SPARQL endpoint (sector 6); snapshot at
-  [`data-apis/eurlex_court_decisions_latest.parquet`](https://github.com/michalovadek/euverse/blob/main/data-apis/eurlex_court_decisions_latest.parquet).
-- EU Member State years come from
-  [`data-final/eu_member_states.parquet`](https://github.com/michalovadek/euverse/blob/main/data-final/eu_member_states.parquet)
-  (built from `data-manual/eu-member-states.csv`).
-
-The most recent case received by the CJ is
-**`r format(max(curia_cases$case_year[curia_cases$court == 'CJ'], na.rm = TRUE), big.mark = '')`**.
-
-Cite as: Ovádek, M. *Judicial Proceedings in the European Union*. Accessed
+Ovádek, M. *Judicial Proceedings in the European Union*. Accessed
 `r format(Sys.Date(), "%d %B %Y")`. Available at
 <https://michalovadek.github.io/euverse/trackers/eu-court.html>.

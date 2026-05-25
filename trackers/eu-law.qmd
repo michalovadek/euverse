@@ -154,47 +154,50 @@ We can look at the extent to which monthly adoption rates this year differ
 from last year.
 
 ```{r yoy, echo=FALSE, fig.height=4, fig.width=9}
-last_two_years <- acts_main |>
+# One row per (act_type, calendar month) for current and previous year.
+acts_monthly <- acts_main |>
   mutate(month_year = as.Date(paste0(str_sub(date, 1, 7), "-01"))) |>
   filter(year %in% c(year_now, year_now - 1)) |>
-  count(month_year, type)
+  count(month_year, type, name = "n")
 
-# Months that exist in BOTH years - we can only compute a year-on-year
-# difference for those. In May 2026 we have Jan-May for both 2025 and
-# 2026; June-Dec are 2025-only and would silently drop out of diff(),
-# making the chart misleading. Filter explicitly.
-months_in_both <- last_two_years |>
-  mutate(year_part = format(month_year, "%Y"),
-         month = format(month_year, "%m")) |>
-  distinct(month, year_part) |>
-  count(month) |>
-  filter(n == 2L) |>
+# Months of the CURRENT year that have at least one observation. The
+# chart shows one bar per (month, type) for those months only, so it
+# grows naturally as new monthly data lands.
+current_months <- acts_monthly |>
+  filter(format(month_year, "%Y") == as.character(year_now)) |>
+  distinct(month_year) |>
+  arrange(month_year) |>
+  mutate(month = format(month_year, "%m")) |>
   pull(month)
 
-last_two_full <- expand.grid(month_year = unique(last_two_years$month_year),
-                             type = unique(last_two_years$type)) |>
-  left_join(last_two_years, by = c("month_year", "type")) |>
-  mutate(n = ifelse(is.na(n), 0L, n)) |>
-  mutate(month = format(month_year, "%m")) |>
-  filter(month %in% months_in_both)
-
-yoy_diff <- last_two_full |>
-  arrange(month_year) |>
-  group_by(month, type) |>
-  reframe(yoy_diff = diff(n)) |>
+# YoY diff per (current-year month, type) = this year's count minus
+# last year's count for the same calendar month.
+yoy_diff <- expand.grid(month = current_months,
+                        type  = unique(acts_main$type)) |>
+  rowwise() |>
+  mutate(n_now  = sum(acts_monthly$n[format(acts_monthly$month_year, "%m") == month &
+                                     format(acts_monthly$month_year, "%Y") == as.character(year_now) &
+                                     acts_monthly$type == type]),
+         n_last = sum(acts_monthly$n[format(acts_monthly$month_year, "%m") == month &
+                                     format(acts_monthly$month_year, "%Y") == as.character(year_now - 1) &
+                                     acts_monthly$type == type]),
+         yoy_diff = n_now - n_last) |>
   ungroup()
 
 p_yoy <- ggplot(yoy_diff,
                 aes(x = month, y = yoy_diff, fill = type,
-                    tooltip = paste0(type, ": ", yoy_diff, " (month ", month, ")"),
+                    tooltip = paste0(type, ": ", n_now, " in ", year_now,
+                                     " vs ", n_last, " in ", year_now - 1,
+                                     " (Δ ", yoy_diff, ")"),
                     data_id = paste0(type, month))) +
   geom_col_interactive(show.legend = FALSE) +
   geom_hline(yintercept = 0, colour = "grey83") +
   facet_wrap(~ type, scales = "free_y") +
   scale_fill_manual(values = mo_palette$categorical[1:4]) +
-  labs(x = "Month", y = "Year-on-year difference",
-       title = "Monthly year-on-year comparison",
-       subtitle = "Difference in acts adopted this year vs last year") +
+  labs(x = NULL, y = "Year-on-year difference",
+       title = paste0("Monthly year-on-year comparison: ", year_now, " vs ", year_now - 1),
+       subtitle = paste0("Acts adopted in each month of ", year_now,
+                         " minus the same month in ", year_now - 1)) +
   theme_mo() +
   theme(strip.text = element_text(hjust = 0, face = "bold"))
 
@@ -261,9 +264,26 @@ outliers_top <- outliers |>
   slice(1:50) |>
   select(-any_of("recent_title")) |>
   left_join(acts |> select(celex, recent_title), by = "celex") |>
-  mutate(tooltip = ifelse(is.na(recent_title),
+  # The snapshot only carries titles for the top-50 newest acts. The
+  # "most slowly adopted" outliers are mostly old, so recent_title is
+  # NA for most of them and the tooltip falls back to a bare CELEX.
+  # Fetch titles for any missing ones at render time (≤50 calls,
+  # cached by Quarto's freeze).
+  mutate(recent_title = ifelse(
+    is.na(recent_title),
+    purrr::map_chr(
+      celex,
+      ~ tryCatch(
+          as.character(eurlex::elx_fetch_data(
+            paste0("http://publications.europa.eu/resource/celex/", .x), "title"))[1],
+          error = function(e) NA_character_)
+    ),
+    recent_title
+  )) |>
+  mutate(recent_title = str_squish(str_remove(recent_title, "\\(?Text with EEA relevance\\)?")),
+         tooltip = ifelse(is.na(recent_title) | recent_title == "",
                           paste0(celex, ": ", days, " days"),
-                          str_squish(str_remove(recent_title, "\\(?Text with EEA relevance\\)?"))),
+                          paste0(recent_title, " (", days, " days)")),
          data_id = celex)
 
 p_outliers <- ggplot(outliers_top, aes(x = as.Date(date), y = days, fill = type, colour = type,
@@ -339,15 +359,26 @@ top_lb_n    <- most_common_lbs$n[1]
 
 The most-invoked legal basis historically is *`r if (is.na(top_lb_name)) most_common_lbs$lbcelex[1] else top_lb_name`*, used as a legal basis on `r mono(fmt_n(top_lb_n))` occasions.
 
+Nonetheless, when we think of legal bases we usually imagine a Treaty
+competence. Filtering to legal bases in the Treaty on the Functioning of
+the European Union (TFEU) and Treaty on European Union (TEU), the
+following table lists the most-invoked Treaty competences since the
+entry into force of the Treaty of Lisbon.
+
 ```{r lbs-table, echo=FALSE}
-most_common_lbs |>
-  transmute(
-    Rank = row_number(),
-    `Legal basis (CELEX)` = lbcelex,
-    `Times invoked` = n,
-    Title = ifelse(is.na(title), "(title unavailable)", title)
-  ) |>
-  dt_mo()
+# Lisbon-treaty CELEX format: 12008E… (TFEU), 12008M… (TEU). Mirror the
+# table layout from the standalone tracker: human-readable "Article XX
+# TFEU/TEU" instead of opaque CELEX codes.
+lisbon_lbs <- lbs_clean |>
+  distinct(celex, lbcelex) |>
+  count(lbcelex, sort = TRUE) |>
+  filter(str_detect(lbcelex, "^12008[EM][0-9]")) |>
+  mutate(art_num    = as.integer(str_extract(lbcelex, "(?<=E|M)[0-9]+")),
+         art_treaty = ifelse(str_detect(lbcelex, "^12008E"), "TFEU", "TEU"),
+         `Treaty article` = paste0("Article ", art_num, " ", art_treaty)) |>
+  transmute(`Treaty article`, `CELEX` = lbcelex, `Times invoked` = n)
+
+dt_mo(lisbon_lbs)
 ```
 
 ```{r lbs-deleg-time, echo=FALSE, fig.height=4, fig.width=9}
@@ -377,20 +408,8 @@ p_deleg
 Most legal acts adopted by the EU are delegated and implementing acts —
 based on another piece of legislation rather than directly on a Treaty.
 
-# About this page
+# Cite
 
-Source data: 4 nightly snapshots of Eur-Lex sector 3 (acts, force,
-proposals, legal bases) in
-[`data-apis/`](https://github.com/michalovadek/euverse/tree/main/data-apis),
-each produced by a fetcher under
-[`R/`](https://github.com/michalovadek/euverse/tree/main/R) using the
-[`eurlex`](https://github.com/michalovadek/eurlex) package. Member-State
-counts come from
-[`data-final/eu_member_states.parquet`](https://github.com/michalovadek/euverse/blob/main/data-final/eu_member_states.parquet).
-
-The most recent act in the snapshot is from
-**`r format(max(as.Date(acts$date), na.rm = TRUE), "%d %B %Y")`**.
-
-Cite as: Ovádek, M. *Legislative Output of the European Union*. Accessed
+Ovádek, M. *Legislative Output of the European Union*. Accessed
 `r format(Sys.Date(), "%d %B %Y")`. Available at
 <https://michalovadek.github.io/euverse/trackers/eu-law.html>.

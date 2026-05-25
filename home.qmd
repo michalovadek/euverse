@@ -7,94 +7,21 @@ page-layout: full
 
 ```{r setup, include=FALSE}
 suppressPackageStartupMessages({
-  library(dplyr)
-  library(stringr)
   library(here)
   library(htmltools)
 })
-source(here::here("R", "freshness.R"))
-
-# Load a few minimal facts from each tracker's snapshot so the landing
-# page surfaces what the trackers actually contain instead of generic
-# "EU stats here" copy. Each fact is the single line a reader would
-# want to know before clicking through.
-
-# ---- EU Finance: latest EA bond yield ---------------------------------------
-yields    <- read_with_freshness("eurostat_teimf050")
-ea_latest <- yields$data |>
-  filter(geo == "EA") |>
-  arrange(desc(date)) |>
-  slice(1)
-fin_fact <- sprintf(
-  "Euro Area 10-year bond yield at %s%%",
-  format(round(ea_latest$yield_pct, 2), nsmall = 2)
-)
-fin_date <- format(as.Date(ea_latest$date), "%B %Y")
-
-# ---- EU Vetoes: latest veto -------------------------------------------------
-vetoes_csv  <- here::here("data-manual", "ms-vetoes.csv")
-vetoes_df   <- read.csv(vetoes_csv, sep = ";", fileEncoding = "UTF-8-BOM") |>
-  select(where(~ !(all(is.na(.)) | all(. == "")))) |>
-  filter(as.Date(date_veto) > as.Date("2011-01-01"))
-latest_veto <- vetoes_df |>
-  arrange(desc(as.Date(date_veto))) |>
-  slice(1)
-veto_fact <- sprintf("%s vetoes recorded since 2011", nrow(vetoes_df))
-veto_date <- format(as.Date(latest_veto$date_veto), "%B %Y")
-
-# ---- EU Court: number of cases in the latest fully-populated year -----------
-# Use the latest year that actually has cases rather than the calendar
-# year — by early in a calendar year Curia hasn't yet listed any cases
-# for it, so showing "0 new cases in <year>" would be misleading. The
-# eu-court tracker page itself shows the calendar-year forecast.
-cases <- read_with_freshness("curia_cases")
-year_now <- as.integer(format(Sys.Date(), "%Y"))
-latest_court_year <- cases$data |>
-  filter(!is.na(case_year)) |>
-  pull(case_year) |>
-  max()
-n_latest_year <- cases$data |>
-  filter(case_year == latest_court_year) |>
-  nrow()
-court_fact <- sprintf("%s new cases lodged in %s",
-                      format(n_latest_year, big.mark = ","),
-                      latest_court_year)
-court_date <- as.character(latest_court_year)
-
-# ---- EU Law: total acts + most recent date ----------------------------------
-acts <- read_with_freshness("eurlex_acts")
-n_acts <- nrow(acts$data)
-law_fact <- sprintf(
-  "%s legal acts in Eur-Lex sector 3",
-  format(n_acts, big.mark = ",")
-)
-law_recent_date <- acts$data |>
-  filter(!is.na(date)) |>
-  pull(date) |>
-  as.Date() |>
-  max(na.rm = TRUE)
-law_date <- format(law_recent_date, "%B %Y")
-
-# ---- EU Enlargement: current MS count + year of latest event ----------------
-ms_enl <- arrow::read_parquet(here::here("data-final", "eu_member_states.parquet"))
-n_current_ms <- ms_enl |> filter(is.na(exit_year)) |> nrow()
-last_event <- max(c(ms_enl$accession_year, ms_enl$exit_year), na.rm = TRUE)
-enl_fact <- sprintf("%s current Member States", n_current_ms)
-enl_date <- as.character(last_event)
 
 # Build one tracker card as a single un-indented HTML string. We use raw
 # sprintf rather than htmltools::div() because htmltools indents nested
 # children by 2 spaces and Pandoc's markdown reader treats indented HTML
 # blocks as code, wrapping the rendered card content in <pre><code> on
 # the live site. Single-line output dodges that entirely.
-card <- function(href, title, blurb, fact, fact_date) {
+card <- function(href, title, blurb) {
   esc <- htmltools::htmlEscape
   paste0(
     '<div class="tracker-card">',
     '<a href="', esc(href), '" class="stretched-link"><h3>', esc(title), '</h3></a>',
     '<p class="tracker-blurb">', esc(blurb), '</p>',
-    '<div class="tracker-fact"><code>', esc(fact), '</code>',
-    '<span class="tracker-date"> &mdash; latest as of ', esc(fact_date), '</span></div>',
     '</div>'
   )
 }
@@ -111,20 +38,15 @@ is the chart the data supports today.
 ```{r cards, echo=FALSE, results='asis'}
 cat(
   card("trackers/eu-finance.html", "EU Finance",
-       "Bond yields, inflation, and the ECB's key rate, plotted against the post-2008 sovereign-debt back-history.",
-       fin_fact, fin_date),
+       "Bond yields, inflation, and the ECB's key rate, plotted against the post-2008 sovereign-debt back-history."),
   card("trackers/eu-vetoes.html", "EU Vetoes",
-       "Every Member State veto on a Council file since 2010, hand-curated from the public record.",
-       veto_fact, veto_date),
+       "Every Member State veto on a Council file since 2010, hand-curated from the public record."),
   card("trackers/eu-court.html", "EU Court",
-       "Caseload, procedure types, rapporteur productivity, and country-of-origin maps for the CJEU.",
-       court_fact, court_date),
+       "Caseload, procedure types, rapporteur productivity, and country-of-origin maps for the CJEU."),
   card("trackers/eu-law.html", "EU Law",
-       "Regulations, directives, decisions, and recommendations adopted by the EU since 1952 — plus how long they took to pass.",
-       law_fact, law_date),
+       "Regulations, directives, decisions, and recommendations adopted by the EU since 1952 — plus how long they took to pass."),
   card("trackers/eu-enlargement.html", "EU Enlargement",
-       "Membership of the EU from the Founding Six in 1957 to today, traced wave by wave (and the one withdrawal).",
-       enl_fact, sprintf("last accession/exit in %s", enl_date)),
+       "Membership of the EU from the Founding Six in 1957 to today, traced wave by wave (and the one withdrawal)."),
   sep = "\n"
 )
 ```
@@ -145,11 +67,12 @@ The full source — fetchers, helpers, qmds, workflow — is at
 
 ## About
 
-I'm [Michal Ovádek](https://www.ucl.ac.uk/political-science/people/dr-michal-ovadek),
-a lecturer in European politics at UCL. The trackers consolidate four
-separate standalone projects I'd been maintaining as one-off Rmd sites;
-the goal here is one nightly render covering all four, with shared
-look-and-feel and shared infrastructure.
+I'm [Michal Ovádek](https://michalovadek.github.io/), a Lecturer in
+European Institutions, Politics and Policy at UCL's Department of
+Political Science. My research focuses on European integration, judicial
+politics, and Central and Eastern Europe. Before UCL I held research
+positions in Sweden and Belgium and worked as a political advisor in the
+European Parliament.
 
 Cite individual trackers by their printed citation block; cite the project
 as a whole as: Ovádek, M. *euverse*. Accessed `r format(Sys.Date(), "%d %B %Y")`.
