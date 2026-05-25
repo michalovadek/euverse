@@ -56,6 +56,10 @@ Since `r start_date`, there have been `r n_vetoes` vetoes by `r n_states`
 Member States across `r n_issues` issues. This page is updated whenever
 a new veto is reported.
 
+```{r freshness, results='asis', echo=FALSE}
+freshness_badge(veto_meta)
+```
+
 ```{r vetoes-table, echo=FALSE}
 veto_data |>
   arrange(desc(as.Date(date_veto))) |>

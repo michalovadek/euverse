@@ -81,6 +81,10 @@ According to public records, **`r n_pending_cj`** cases are currently
 pending before the Court of Justice and **`r n_pending_gc`** before the
 General Court.
 
+```{r freshness, results='asis', echo=FALSE}
+freshness_badge_combined(list(cc$meta, ed$meta))
+```
+
 ```{r recent-cj-cases, echo=FALSE}
 curia_cases |>
   filter(court == "CJ") |>

@@ -1,0 +1,13 @@
+# old/ contains the standalone-tracker Rmds that are kept around as
+# historical reference only — they're not rendered by this repo
+# (project.render in _quarto.yml excludes them via "!old/**"). Without
+# this ignore, renv's implicit snapshot scans their library() calls
+# and complains that tidyverse, equatiomatic, gfonts, dbplyr, etc.
+# are "used but not recorded" — they're not actually used by any
+# active fetcher or tracker.
+old/
+
+# _site/ and _freeze/ are render output / cache — also not real sources.
+_site/
+_freeze/
+.quarto/
