@@ -25,6 +25,11 @@ ms_meta <- manual_meta(ms_csv, source_label = "data-manual/eu-member-states.csv 
 ms <- arrow::read_parquet(here::here("data-final", "eu_member_states.parquet"))
 ms_meta$rows <- nrow(ms)
 
+cand_csv <- here::here("data-manual", "eu-candidate-states.csv")
+candidates <- read.csv(cand_csv, na.strings = "") |>
+  mutate(candidate_year     = as.integer(candidate_year),
+         negotiations_year  = as.integer(negotiations_year))
+
 today_d  <- Sys.Date()
 year_now <- as.integer(format(today_d, "%Y"))
 
@@ -159,22 +164,65 @@ ms_wave |>
   dt_mo()
 ```
 
-# Notes on candidate countries
+# Candidate and potential-candidate countries
 
-This page reflects only **current and historical Member States**. As of
-`r format(today_d, "%B %Y")`, ten countries hold formal candidate or
-potential-candidate status with the EU: Albania, Bosnia and Herzegovina,
-Georgia, Kosovo, Moldova, Montenegro, North Macedonia, Serbia, Türkiye,
-and Ukraine. They are not shown here because the accession-and-exit
-master that powers the rest of the euverse trackers only contains
-states that have completed accession.
+The chart and table above only show **current and historical Member
+States**. As of `r format(today_d, "%B %Y")`, **`r sum(candidates$status == "candidate")`**
+countries hold formal candidate status and **`r sum(candidates$status == "potential candidate")`**
+hold potential-candidate status. Together they describe the EU's
+current enlargement pipeline.
 
-Adding candidate countries — with their candidate-status date and
-negotiation milestones — would let this page become a real "EU
-enlargement pipeline" tracker rather than a historical one. That is
-listed in
-[`docs/specs/2026-05-25-future-content-suggestions.md`](https://github.com/michalovadek/euverse/blob/main/docs/specs/2026-05-25-future-content-suggestions.md)
-as suggestion #1.
+```{r candidates-timeline, echo=FALSE, fig.height=4.5, fig.width=9}
+cand_plot <- candidates |>
+  mutate(start = candidate_year,
+         end   = year_now,
+         label = paste0(country, " (", iso2, ")")) |>
+  arrange(desc(candidate_year), country) |>
+  mutate(label = factor(label, levels = label))
+
+p_cand <- ggplot(cand_plot,
+                 aes(y = label,
+                     tooltip = paste0(country, ": ", status,
+                                      " since ", candidate_year,
+                                      ifelse(is.na(negotiations_year), "",
+                                             paste0(", negotiations from ",
+                                                    negotiations_year))),
+                     data_id = iso2)) +
+  geom_segment_interactive(aes(x = start, xend = end, yend = label,
+                               colour = status),
+                           linewidth = 4, lineend = "round") +
+  geom_point_interactive(aes(x = negotiations_year, yend = label),
+                         size = 3, shape = 21, fill = "white",
+                         colour = "grey30",
+                         na.rm = TRUE) +
+  scale_colour_manual(values = c(candidate = mo_palette$categorical[5],
+                                 `potential candidate` = mo_palette$categorical[8])) +
+  scale_x_continuous(breaks = seq(1995, year_now, 5), expand = c(0.02, 0.02)) +
+  labs(x = NULL, y = NULL,
+       title = "Current EU enlargement pipeline",
+       subtitle = "Bar runs from candidate-status year; ring marks year accession negotiations opened",
+       colour = NULL,
+       caption = "Türkiye: negotiations opened 2005 but effectively frozen since 2018.") +
+  theme_mo() +
+  theme(panel.grid.major.y = element_blank())
+
+girafe(ggobj = p_cand, width_svg = 9, height_svg = 4.5)
+```
+
+```{r candidates-table, echo=FALSE}
+candidates |>
+  arrange(country) |>
+  transmute(
+    Country                = country,
+    `ISO-2`                = iso2,
+    Status                 = status,
+    `Candidate since`      = ifelse(is.na(candidate_year), "—",
+                                    as.character(candidate_year)),
+    `Negotiations since`   = ifelse(is.na(negotiations_year), "—",
+                                    as.character(negotiations_year))
+  ) |>
+  dt_mo()
+```
 
 # About this page
 
