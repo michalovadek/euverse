@@ -153,21 +153,34 @@ from last year.
 
 ```{r yoy, echo=FALSE, fig.height=4, fig.width=9}
 last_two_years <- acts_main |>
-  mutate(month_year = as.Date(str_replace(date, "[:digit:][:digit:]$", "01"))) |>
-  mutate(year = as.integer(str_sub(date, 1, 4))) |>
+  mutate(month_year = as.Date(paste0(str_sub(date, 1, 7), "-01"))) |>
   filter(year %in% c(year_now, year_now - 1)) |>
   count(month_year, type)
+
+# Months that exist in BOTH years - we can only compute a year-on-year
+# difference for those. In May 2026 we have Jan-May for both 2025 and
+# 2026; June-Dec are 2025-only and would silently drop out of diff(),
+# making the chart misleading. Filter explicitly.
+months_in_both <- last_two_years |>
+  mutate(year_part = format(month_year, "%Y"),
+         month = format(month_year, "%m")) |>
+  distinct(month, year_part) |>
+  count(month) |>
+  filter(n == 2L) |>
+  pull(month)
 
 last_two_full <- expand.grid(month_year = unique(last_two_years$month_year),
                              type = unique(last_two_years$type)) |>
   left_join(last_two_years, by = c("month_year", "type")) |>
-  mutate(n = ifelse(is.na(n), 0L, n))
+  mutate(n = ifelse(is.na(n), 0L, n)) |>
+  mutate(month = format(month_year, "%m")) |>
+  filter(month %in% months_in_both)
 
 yoy_diff <- last_two_full |>
   arrange(month_year) |>
-  mutate(month = str_sub(month_year, 6, 7)) |>
   group_by(month, type) |>
-  reframe(yoy_diff = diff(n))
+  reframe(yoy_diff = diff(n)) |>
+  ungroup()
 
 p_yoy <- ggplot(yoy_diff,
                 aes(x = month, y = yoy_diff, fill = type,
