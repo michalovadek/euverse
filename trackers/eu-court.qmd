@@ -14,6 +14,8 @@ suppressPackageStartupMessages({
   library(ggplot2)
   library(ggiraph)
   library(here)
+  library(maps)      # provides map data behind ggplot2::map_data
+  library(mapproj)   # provides projections used by coord_map()
 })
 source(here::here("R", "theme.R"))
 source(here::here("R", "freshness.R"))
@@ -436,11 +438,11 @@ p_map <- ggplot(n_refs_country) +
     inherit.aes = FALSE
   ) +
   expand_limits(x = c(-13.66, 38.55), y = c(34.5, 71.05)) +
-  # coord_quickmap fixes the lat/lon aspect ratio without needing the
-  # mapproj package (which would be a new renv pin). It picks a sensible
-  # constant scaling from the lat midpoint, so countries are not stretched
-  # horizontally as in the unprojected default.
-  coord_quickmap() +
+  # Albers conic projection via coord_map (needs mapproj, pinned in
+  # renv.lock). Standard parallels at 40 and 60 °N give a nice
+  # equal-area look for Europe — much better than the default
+  # unprojected stretch.
+  coord_map("albers", lat0 = 40, lat1 = 60) +
   scale_fill_gradientn(colours = mo_palette$sequential(9), na.value = "grey85") +
   labs(x = NULL, y = NULL,
        title = "Preliminary references by country of origin",
