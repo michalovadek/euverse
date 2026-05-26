@@ -177,7 +177,6 @@ jobs:
           set -euo pipefail
           declare -A urls=(
             ["https://michalovadek.github.io/euverse/home.html"]="tracker-card"
-            ["https://michalovadek.github.io/euverse/data.html"]="Data downloads"
             ["https://michalovadek.github.io/euverse/trackers/eu-finance.html"]="Data as of"
             ["https://michalovadek.github.io/euverse/trackers/eu-vetoes.html"]="Data as of"
             ["https://michalovadek.github.io/euverse/trackers/eu-court.html"]="Data as of"
