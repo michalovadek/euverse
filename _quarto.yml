@@ -23,22 +23,31 @@ website:
   repo-actions: [issue, source]
   back-to-top-navigation: true
   page-navigation: true
+  # Top navbar is intentionally minimal: the site title (top-left) links
+  # to home, and the search box sits top-right. All page navigation
+  # lives in the docked left sidebar below so the visual hierarchy reads
+  # like a book chapter list rather than a website menu.
   navbar:
-    left:
-      - href: home.qmd
-        text: Home
-      - text: Trackers
-        menu:
-          - href: trackers/eu-finance.qmd
-            text: EU Finance
-          - href: trackers/eu-vetoes.qmd
-            text: EU Vetoes
-          - href: trackers/eu-court.qmd
-            text: EU Court
-          - href: trackers/eu-law.qmd
-            text: EU Law
-          - href: trackers/eu-enlargement.qmd
-            text: EU Enlargement
+    search: true
+  sidebar:
+    style: docked
+    align: left
+    search: false   # search lives in the navbar, not here
+    contents:
+      - text: Home
+        href: home.qmd
+      - section: Trackers
+        contents:
+          - text: EU Finance
+            href: trackers/eu-finance.qmd
+          - text: EU Vetoes
+            href: trackers/eu-vetoes.qmd
+          - text: EU Court
+            href: trackers/eu-court.qmd
+          - text: EU Law
+            href: trackers/eu-law.qmd
+          - text: EU Enlargement
+            href: trackers/eu-enlargement.qmd
 
 format:
   html:
