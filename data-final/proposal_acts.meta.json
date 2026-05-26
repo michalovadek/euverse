@@ -1,0 +1,10 @@
+{
+  "source": "proposal_acts",
+  "built_at": "2026-05-26T09:48:06Z",
+  "inputs": "data-final/proposals_master.parquet",
+  "builder_script": "R/build_proposal_acts.R",
+  "rows": 25965,
+  "distinct_proposals": 24856,
+  "distinct_acts": 25467,
+  "multi_act_proposals": 631
+}

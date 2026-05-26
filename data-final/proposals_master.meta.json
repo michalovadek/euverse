@@ -1,0 +1,11 @@
+{
+  "source": "proposals_master",
+  "built_at": "2026-05-26T09:47:24Z",
+  "inputs": ["data-external/euprops/euprops_v2_0.parquet", "data-apis/eurlex_proposals_latest.parquet"],
+  "builder_script": "R/build_proposals_master.R",
+  "rows": 31003,
+  "euprops_kept": 29545,
+  "euprops_dropped": 836,
+  "eurlex_tail": 1458,
+  "euprops_cutoff": "2022-05-06"
+}

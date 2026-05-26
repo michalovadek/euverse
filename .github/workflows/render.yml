@@ -110,6 +110,29 @@ jobs:
           done
           $any || echo "No R/fetch_*.R scripts yet — skipping fetch stage."
 
+      # Rebuild the cross-cutting derived datasets in data-final/ from the
+      # freshly-fetched data-apis/ snapshots + static data-manual/data-external
+      # inputs. Order is explicit because build_proposal_acts reads
+      # build_proposals_master's output (and alphabetical-glob order would
+      # be wrong: proposal_acts < proposals_master). Each script fails the
+      # workflow on error (unlike fetchers, which gracefully degrade) —
+      # a build failure means the derived parquet would mismatch its
+      # inputs and downstream pages would silently render from stale data.
+      - name: Rebuild data-final/
+        shell: bash
+        run: |
+          for f in \
+              R/build_data_external_parquets.R \
+              R/build_eu_member_states.R \
+              R/build_proposals_master.R \
+              R/build_proposal_acts.R \
+          ; do
+            name=$(basename "$f")
+            echo "::group::$name"
+            Rscript "$f"
+            echo "::endgroup::"
+          done
+
       - name: Render Quarto site
         run: quarto render
 
