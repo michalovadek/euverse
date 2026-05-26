@@ -12,12 +12,21 @@ $headings-font-weight: 700 !default;
 // visually attached to "Trackers".
 .sidebar-item.sidebar-item-section > .sidebar-item-container {
   justify-content: flex-start !important;
+  display: flex !important;
+  gap: 0 !important;
 }
 .sidebar-item.sidebar-item-section > .sidebar-item-container > .sidebar-item-text {
   flex: 0 0 auto !important;
+  width: auto !important;       // override Quarto's default width:100%
 }
 .sidebar-item.sidebar-item-section > .sidebar-item-container > .sidebar-item-toggle {
   flex: 0 0 auto !important;
+  margin: 0 !important;
+  padding-left: 0.25rem !important;
+}
+// The chevron <i> inside the toggle has Bootstrap's "ms-2" class
+// (margin-start:.5rem). Override so it sits flush with the label.
+.sidebar-item.sidebar-item-section .sidebar-item-toggle .bi {
   margin-left: 0 !important;
 }
 
