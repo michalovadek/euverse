@@ -198,12 +198,50 @@ newdat_t1 <- tibble(
 )
 yhat_ols_t1 <- as.integer(round(predict(out_ols, newdat_t1, type = "response"), 0))
 
-# Plot: actual bars + 2 dashed-outline prediction bars
-plot_dat <- n_cases_year_court |>
-  filter(case_year > year_now - 7, court == "CJ") |>
-  mutate(tooltip = paste0("N = ", n), data_id = paste0("actual", case_year))
-
 cj_color <- court_palette$color[court_palette$court == "CJ"]
+
+# Plot: actual bars + 2 dashed-outline prediction bars.
+#
+# Curia's case-list scrape lags upstream by several months for the
+# current year, so n_cases_year_court is often missing a year_now row
+# despite cases being publicly registered. When curia is behind, fall
+# back to eurlex_court_decisions: every decision celex encodes a case
+# year + court + case_number ("62026CJ0024" = case 24 of 2026, CJ).
+# CJEU case numbers are sequential, so the MAX case_number observed
+# in year_now decisions is a tight lower bound on cases lodged so far.
+# This is what makes the actual bar appear inside the dashed year_now
+# prediction bar instead of nothing showing.
+plot_dat <- n_cases_year_court |>
+  filter(case_year > year_now - 7, court == "CJ")
+
+if (!any(plot_dat$case_year == year_now)) {
+  cj_partial <- decisions |>
+    filter(clx_court == "C", clx_year == year_now, !is.na(celex)) |>
+    mutate(case_num = suppressWarnings(as.integer(
+      stringr::str_extract(celex, "(?<=[A-Z])[0-9]+")))) |>
+    filter(!is.na(case_num)) |>
+    summarise(max_case = max(case_num, na.rm = TRUE)) |>
+    pull(max_case)
+
+  if (length(cj_partial) == 1L && is.finite(cj_partial) && cj_partial > 0) {
+    plot_dat <- dplyr::bind_rows(plot_dat, tibble::tibble(
+      court       = "CJ",
+      case_year   = year_now,
+      n           = as.integer(cj_partial),
+      color       = cj_color,
+      global_mean = NA_real_
+    ))
+  }
+}
+
+plot_dat <- plot_dat |>
+  mutate(tooltip = ifelse(
+           case_year == year_now,
+           paste0("≥ ", n, " cases lodged so far in ", year_now,
+                  " (lower bound from EUR-Lex case numbers; Curia case list still behind)"),
+           paste0("N = ", n)
+         ),
+         data_id = paste0("actual", case_year))
 
 p_forecast <- ggplot(plot_dat, aes(x = case_year, y = n)) +
   # Forecast bars BEHIND the actual bars. alpha 0.4 + linewidth 0.6
