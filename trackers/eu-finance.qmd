@@ -120,23 +120,24 @@ non_ea_recent <- country_data |>
 ea_series <- eus$data |> filter(geo == "EA") |> select(-geo, -country_name)
 
 p_country <- ggplot(country_data,
-                    aes(x = date, y = yield_pct)) +
+                    aes(x = date, y = yield_pct, colour = geo)) +
   geom_line(data = ea_series, aes(x = date, y = yield_pct),
-            colour = mo_palette$categorical[5], linetype = 2) +
-  geom_line_interactive(colour = "grey55", linewidth = 0.3) +
+            colour = "grey40", linetype = 2, inherit.aes = FALSE) +
+  geom_line_interactive(linewidth = 0.4) +
   geom_point_interactive(
     aes(tooltip = paste0(country_name, ": ", round(yield_pct, 2), "% (",
                          format(date, "%Y-%m"), ")"),
         data_id  = paste0(geo, format(date, "-%Y-%m"))),
-    size = 1.5, colour = "grey35"
+    size = 1.4
   ) +
   scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
   scale_y_continuous(labels = function(x) paste0(x, "%")) +
+  scale_colour_manual(values = mo_palette$ms_flags, guide = "none") +
   facet_wrap(~ country_name) +
   labs(x = NULL, y = "Yield",
        title = "Government bond yields in the EU",
        subtitle = "10-year maturity, monthly data",
-       caption = "Dashed line: Euro Area average") +
+       caption = "Dashed grey line: Euro Area average") +
   theme_mo() +
   theme(axis.text.x = element_text(size = 6),
         strip.text  = element_text(hjust = 1))
