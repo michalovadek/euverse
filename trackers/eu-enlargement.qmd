@@ -50,25 +50,25 @@ count_by_year <- ms_long |> count(year, name = "n_ms")
 # 2007, 2013 enlargements. UK leaves the EU in 2020 (Brexit).
 ms_wave <- ms |>
   mutate(wave = case_when(
-    accession_year == 1952 ~ "1952 — Founding 6 (BE, DE, FR, IT, LU, NL)",
-    accession_year == 1973 ~ "1973 — North-Western (DK, IE, UK)",
-    accession_year == 1981 ~ "1981 — Greece",
-    accession_year == 1986 ~ "1986 — Iberia (PT, ES)",
-    accession_year == 1995 ~ "1995 — EFTA (AT, FI, SE)",
-    accession_year == 2004 ~ "2004 — Eastern Big Bang (10 states)",
-    accession_year == 2007 ~ "2007 — Bulgaria + Romania",
-    accession_year == 2013 ~ "2013 — Croatia",
+    accession_year == 1952 ~ "1952: Founding 6 (BE, DE, FR, IT, LU, NL)",
+    accession_year == 1973 ~ "1973: North-Western (DK, IE, UK)",
+    accession_year == 1981 ~ "1981: Greece",
+    accession_year == 1986 ~ "1986: Iberia (PT, ES)",
+    accession_year == 1995 ~ "1995: EFTA (AT, FI, SE)",
+    accession_year == 2004 ~ "2004: Eastern Big Bang (10 states)",
+    accession_year == 2007 ~ "2007: Bulgaria + Romania",
+    accession_year == 2013 ~ "2013: Croatia",
     TRUE                    ~ NA_character_
   )) |>
   mutate(wave = factor(wave, levels = c(
-    "1952 — Founding 6 (BE, DE, FR, IT, LU, NL)",
-    "1973 — North-Western (DK, IE, UK)",
-    "1981 — Greece",
-    "1986 — Iberia (PT, ES)",
-    "1995 — EFTA (AT, FI, SE)",
-    "2004 — Eastern Big Bang (10 states)",
-    "2007 — Bulgaria + Romania",
-    "2013 — Croatia"
+    "1952: Founding 6 (BE, DE, FR, IT, LU, NL)",
+    "1973: North-Western (DK, IE, UK)",
+    "1981: Greece",
+    "1986: Iberia (PT, ES)",
+    "1995: EFTA (AT, FI, SE)",
+    "2004: Eastern Big Bang (10 states)",
+    "2007: Bulgaria + Romania",
+    "2013: Croatia"
   )))
 
 # Per-year membership tagged with each MS's wave - needed for the
@@ -79,7 +79,7 @@ ms_long_wave <- ms_long |>
 ```
 
 The European Economic Community started life in 1957 with six members.
-By 2020 it had become the European Union of 27 — having passed through
+By 2020 it had become the European Union of 27, having passed through
 `r mono(length(unique(ms_wave$wave)))` distinct enlargement waves and one
 withdrawal. This page traces that history from the source data the rest
 of the euverse trackers depend on: the small hand-curated master file
@@ -97,7 +97,7 @@ ggplot(ms_long_wave, aes(x = year, y = n_ms, fill = wave)) +
   geom_area(colour = "white", linewidth = 0.15) +
   scale_fill_manual(values = mo_palette$categorical) +
   scale_x_continuous(expand = c(0, 0), breaks = seq(1950, year_now, 10)) +
-  scale_y_continuous(expand = c(0, 0), breaks = c(6, 9, 10, 12, 15, 25, 27, 28),
+  scale_y_continuous(expand = c(0, 0), breaks = c(6, 9, 12, 15, 27, 28),
                      limits = c(0, 30)) +
   labs(x = NULL, y = NULL,
        title = "EU membership over time",
@@ -110,8 +110,8 @@ ggplot(ms_long_wave, aes(x = year, y = n_ms, fill = wave)) +
 ```
 
 The 2004 "Big Bang" enlargement remains the largest single accession in
-EU history: ten countries — most of post-Soviet Central and Eastern
-Europe plus Malta and Cyprus — joined on the same day. The chart's only
+EU history: ten countries (most of post-Soviet Central and Eastern
+Europe, plus Malta and Cyprus) joined on the same day. The chart's only
 dip is **2020**, when the United Kingdom became the first (and so far
 only) Member State to leave.
 
@@ -128,8 +128,8 @@ p_timeline <- ggplot(ms_timeline,
                          colour = wave,
                          tooltip = paste0(country, " (", iso2, "): ",
                                           accession_year,
-                                          ifelse(is.na(exit_year), "—now",
-                                                 paste0("—", exit_year))),
+                                          ifelse(is.na(exit_year), " to today",
+                                                 paste0(" to ", exit_year))),
                          data_id = iso2)) +
   geom_segment_interactive(aes(yend = country), linewidth = 4, lineend = "round") +
   geom_point_interactive(aes(x = accession_year), size = 2.6) +
@@ -157,11 +157,11 @@ ms_wave |>
     Country       = country,
     `ISO-2`       = iso2,
     `Joined`      = accession_year,
-    `Left`        = ifelse(is.na(exit_year), "—", as.character(exit_year)),
+    `Left`        = ifelse(is.na(exit_year), "", as.character(exit_year)),
     `Years as MS` = ifelse(is.na(exit_year),
                            year_now - accession_year,
                            exit_year - accession_year),
-    Wave          = stringr::str_remove(as.character(wave), " — .*$")
+    Wave          = stringr::str_remove(as.character(wave), ":.*$")
   ) |>
   dt_mo()
 ```
@@ -180,7 +180,7 @@ enlargement pipeline.
 # Chart shows only countries with a candidate_year (i.e. excludes
 # Kosovo, which has applied but has no formal candidate status yet;
 # Kosovo still appears in the table below). Sort by accession-status
-# year, descending — newest aspirants at the top.
+# year, descending, so newest aspirants are at the top.
 cand_plot <- candidates |>
   filter(!is.na(candidate_year)) |>
   mutate(end   = year_now,
@@ -231,9 +231,9 @@ candidates |>
     Country                = country,
     `ISO-2`                = iso2,
     Status                 = status,
-    `Candidate since`      = ifelse(is.na(candidate_year), "—",
+    `Candidate since`      = ifelse(is.na(candidate_year), "",
                                     as.character(candidate_year)),
-    `Negotiations since`   = ifelse(is.na(negotiations_year), "—",
+    `Negotiations since`   = ifelse(is.na(negotiations_year), "",
                                     as.character(negotiations_year))
   ) |>
   dt_mo()

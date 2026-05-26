@@ -130,6 +130,7 @@ p_caseload <- ggplot(n_cases_year_court,
   scale_fill_identity() +
   scale_colour_identity() +
   scale_x_continuous(breaks = seq(1950, year_now + 1, by = 10)) +
+  scale_y_continuous(breaks = int_breaks()) +
   facet_wrap(~ court_long, scales = "free_y", ncol = 1) +
   labs(x = NULL, y = NULL,
        title = "Number of cases received by EU courts",
@@ -224,6 +225,7 @@ p_forecast <- ggplot(plot_dat, aes(x = case_year, y = n)) +
   geom_col_interactive(aes(fill = color, tooltip = tooltip, data_id = data_id)) +
   scale_fill_identity() +
   scale_x_continuous(breaks = (year_now - 7):(year_now + 1)) +
+  scale_y_continuous(breaks = int_breaks()) +
   labs(x = NULL, y = NULL,
        title = "Number of cases received by the Court of Justice",
        subtitle = "Forecast for the current and next year",
@@ -374,7 +376,7 @@ how many decisions a judge writes is the length of their tenure.
 
 Historically the most important subset of CJEU cases comes through the
 preliminary ruling procedure (Art 267 TFEU). The most well-known CJ
-decisions — _Costa v ENEL_, _Cassis de Dijon_ — originated in references
+decisions, such as _Costa v ENEL_ or _Cassis de Dijon_, originated in references
 from national courts.
 
 ```{r prelrefsmap, echo=FALSE, fig.height=6, fig.width=9}
@@ -399,7 +401,7 @@ refs_map_dat <- ggplot2::map_data("world",
          region = ifelse(region == "UK", "United Kingdom", region))
 
 # Country centroids for label overlay. Hardcoded because the map data
-# is polygon outlines, not centroids — and the small countries (MT,
+# is polygon outlines, not centroids, and the small countries (MT,
 # CY, LU) are otherwise unfindable on a Europe-scale map. Each row
 # carries the ISO-2 code shown over the country and the full name for
 # the tooltip + map join key.
@@ -457,7 +459,7 @@ p_map <- ggplot(n_refs_country) +
   expand_limits(x = c(-13.66, 38.55), y = c(34.5, 71.05)) +
   # Albers conic projection via coord_map (needs mapproj, pinned in
   # renv.lock). Standard parallels at 40 and 60 °N give a nice
-  # equal-area look for Europe — much better than the default
+  # equal-area look for Europe, much better than the default
   # unprojected stretch.
   coord_map("albers", lat0 = 40, lat1 = 60) +
   scale_fill_gradientn(colours = mo_palette$sequential(9), na.value = "grey85") +
@@ -512,7 +514,7 @@ girafe(ggobj = p_refs_time, width_svg = 9, height_svg = 7)
 
 Referral activity has increased over time in most countries as the CJEU
 and its preliminary-ruling procedure gained prominence. Note that the
-data here comes from _closed_ cases only — many recent referrals are
+data here comes from _closed_ cases only, so many recent referrals are
 still pending.
 
 # Cite

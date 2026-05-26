@@ -27,11 +27,11 @@ card <- function(href, title, blurb) {
 }
 ```
 
-The European Union generates an extraordinary amount of public data — court
-rulings, vetoes, legal acts, financial indicators. Most of it lives behind
-unfriendly APIs and PDF archives. This site pulls those streams into
-plain-language dashboards that re-render every night, so the chart you see
-is the chart the data supports today.
+The European Union generates an extraordinary amount of public data:
+court rulings, vetoes, legal acts, financial indicators. Most of it lives
+behind unfriendly APIs and PDF archives. This site pulls those streams
+into plain-language dashboards that re-render every night, so the chart
+you see is the chart the data supports today.
 
 ::: {.tracker-grid}
 
@@ -44,7 +44,7 @@ cat(
   card("trackers/eu-court.html", "EU Court",
        "Caseload, procedure types, rapporteur productivity, and country-of-origin maps for the CJEU."),
   card("trackers/eu-law.html", "EU Law",
-       "Regulations, directives, decisions, and recommendations adopted by the EU since 1952 — plus how long they took to pass."),
+       "Regulations, directives, decisions, and recommendations adopted by the EU since 1952, plus how long they took to pass."),
   card("trackers/eu-enlargement.html", "EU Enlargement",
        "Membership of the EU from the Founding Six in 1957 to today, traced wave by wave (and the one withdrawal)."),
   sep = "\n"
@@ -62,7 +62,7 @@ nightly at 03:17 UTC; if a fetch fails, the page falls back to the previous
 good snapshot and shows a visible "data as of" badge so you always know
 how stale you're looking.
 
-The full source — fetchers, helpers, qmds, workflow — is at
+The full source (fetchers, helpers, qmds, workflow) is at
 [github.com/michalovadek/euverse](https://github.com/michalovadek/euverse).
 
 ## About

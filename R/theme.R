@@ -65,6 +65,19 @@ mono <- function(x) {
   htmltools::HTML(paste0("<code>", as.character(x), "</code>"))
 }
 
+int_breaks <- function(n = 5) {
+  # ggplot2 break function that forces INTEGER ticks. Use on any axis
+  # whose underlying variable is a count (there's no such thing as half
+  # a veto, half a case, half a Member State). Falls back to pretty()
+  # which already gives integer ticks for small ranges, then de-dupes
+  # to handle the small-range case where pretty(0:3) would yield
+  # c(0, 0.5, 1.0, 1.5, ...) and we want c(0, 1, 2, 3).
+  function(x) {
+    breaks <- pretty(x, n = n)
+    unique(as.integer(round(breaks)))
+  }
+}
+
 register_ggiraph_defaults <- function() {
   ggiraph::set_girafe_defaults(
     opts_hover = ggiraph::opts_hover(

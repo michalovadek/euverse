@@ -92,7 +92,7 @@ country_data <- eus$data |>
   filter(!geo %in% c("EA", "EU27_2020"))
 
 # Latest observation per country, then rank for max/min prose. We must
-# drop NAs BEFORE slice_min/max — those functions return zero-row
+# drop NAs BEFORE slice_min/max because those functions return zero-row
 # results if the value column is all-NA in a group, which then crashes
 # the inline R expressions further down with NULL$country_name.
 cur_latest <- country_data |>
@@ -154,8 +154,8 @@ Over the last twelve months, the Euro Area aggregate yield averaged
 `r mono(paste0(ea_recent$mean, "%"))`, while EU members outside the euro
 averaged `r mono(paste0(non_ea_recent$mean, "%"))`. The simplistic comparison is confounded by
 uneven group composition (macroeconomic stability, debt loads), but
-comparing matched pairs across the divide — e.g. Czechia vs. Slovakia, or
-Finland vs. Sweden — can be instructive.
+comparing matched pairs across the divide (for example Czechia vs.
+Slovakia, or Finland vs. Sweden) can be instructive.
 
 # Euro Area key interest rate and inflation
 
@@ -184,7 +184,7 @@ rates_long <- rates_wide |>
   tidyr::pivot_longer(cols = -date, names_to = "series", values_to = "value") |>
   filter(!is.na(value))
 
-# y range for the zoom panel — set explicitly so the inner panel rescales
+# y range for the zoom panel, set explicitly so the inner panel rescales
 # to the values that actually appear in the last 12 months instead of
 # inheriting the full historical 0-5% range.
 rates_recent <- rates_long |> filter(date >= today_d - 365)

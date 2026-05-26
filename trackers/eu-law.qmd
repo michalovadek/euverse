@@ -31,10 +31,9 @@ lbs_meta        <- read_with_freshness("eurlex_lbs")
 ms              <- arrow::read_parquet(here::here("data-final", "eu_member_states.parquet"))
 # proposals_master: EUPROPS-trusted historical proposals (1958-2022) +
 # Eur-Lex tail (post-2022). Carries proposal_type, is_amending, adopted
-# date, withdrawn status — all of which the raw Eur-Lex proposals
+# date, withdrawn status: all of which the raw Eur-Lex proposals
 # snapshot lacks. See R/build_proposals_master.R for the merge logic.
 props_master  <- arrow::read_parquet(here::here("data-final", "proposals_master.parquet"))
-prop_acts     <- arrow::read_parquet(here::here("data-final", "proposal_acts.parquet"))
 
 acts       <- acts_meta$data
 acts_force <- force_meta$data
@@ -110,6 +109,7 @@ p_n_acts <- ggplot(n_relevant,
                        data_id = paste0(type, year))) +
   geom_col_interactive(show.legend = FALSE) +
   scale_fill_manual(values = mo_palette$categorical[1:4]) +
+  scale_y_continuous(breaks = int_breaks()) +
   facet_wrap(~ type, scales = "free_y") +
   labs(x = NULL, y = "Number of acts",
        title = "Number of legal acts produced by the EU",
@@ -151,7 +151,7 @@ p_prop
 ```
 
 Although regulations used to dominate the EU's legislative output,
-decisions — typically associated with administrative actions — are nowadays
+decisions (typically associated with administrative actions) are nowadays
 almost equally prevalent.
 
 # Year-on-year comparison
@@ -216,11 +216,8 @@ Not all legal acts remain in force indefinitely. According to Eur-Lex, the
 EU has `r mono(fmt_n(sum(acts_force$force == 'true')))` acts
 in force at the moment.
 
-EU law tends to be cumulative: most acts adopted in any given year amend
-or implement an earlier one. Data on this from EUPROPS (a curated
-proposals dataset; see [Cite](#cite)) shows that roughly
-`r mono(paste0(round(100 * mean(props_master$is_amending[!is.na(props_master$is_amending)]), 0), "%"))`
-of Commission proposals on record are amending proposals.
+EU law tends to be cumulative: many acts adopted in any given year
+amend or implement an earlier one.
 
 ```{r in-force, echo=FALSE, fig.height=4, fig.width=9}
 in_force_clean <- acts_force |>
@@ -233,6 +230,7 @@ p_inforce <- ggplot(in_force_clean,
                     aes(x = days_in_force, fill = type)) +
   geom_histogram(bins = 100, show.legend = FALSE) +
   scale_fill_manual(values = mo_palette$categorical[1:4]) +
+  scale_y_continuous(breaks = int_breaks()) +
   facet_wrap(~ type, scales = "free") +
   labs(x = NULL, y = NULL,
        title = "How old are currently applicable legal acts?",
@@ -246,19 +244,25 @@ p_inforce
 # Proposals
 
 Behind every adopted act is at least one Commission proposal. The
-[EUPROPS dataset](https://www.michalovadek.github.io/) (curated through
-2022) corrects systematic errors in Eur-Lex's proposal metadata; we
-combine it with the nightly Eur-Lex pull for the post-2022 tail. Total
-proposals in scope: `r mono(fmt_n(nrow(props_master)))`, of which
-`r mono(fmt_n(sum(!is.na(props_master$adopted))))` led to at least one
-adopted act and
+[EUPROPS dataset](https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/PU4HG8)
+(curated through 2022) corrects systematic errors in Eur-Lex's proposal
+metadata; we combine it with the nightly Eur-Lex pull for the
+post-2022 tail. Total proposals in scope: `r mono(fmt_n(nrow(props_master)))`,
+of which `r mono(fmt_n(sum(!is.na(props_master$adopted))))` led to at
+least one adopted act and
 `r mono(fmt_n(sum(props_master$withdrawn %in% c('withdrawn', 'rejected', 'not adopted', 'replaced'))))`
 were withdrawn, rejected, replaced, or never adopted.
+
+Note: EUPROPS coverage of *recommendations* is very thin (fewer than
+30 records across its 70-year span), so EUPROPS-driven charts on this
+page restrict themselves to the three main types (regulations,
+directives, decisions). The act-side counts shown earlier in the page
+draw on the complete Eur-Lex acts table and do include recommendations.
 
 ```{r prop-by-type, echo=FALSE, fig.height=4.5, fig.width=9}
 props_yearly <- props_master |>
   filter(!is.na(proposed),
-         proposal_type %in% c("Regulation", "Directive", "Decision", "Recommendation")) |>
+         proposal_type %in% c("Regulation", "Directive", "Decision")) |>
   mutate(year = as.integer(format(proposed, "%Y"))) |>
   filter(year >= 1958, year <= year_now) |>
   count(year, proposal_type)
@@ -268,32 +272,33 @@ p_props <- ggplot(props_yearly,
                       tooltip = paste0(proposal_type, ": ", n, " proposals (", year, ")"),
                       data_id = paste0(proposal_type, year))) +
   geom_col_interactive(show.legend = FALSE) +
-  scale_fill_manual(values = mo_palette$categorical[1:4]) +
+  scale_fill_manual(values = mo_palette$categorical[1:3]) +
+  scale_y_continuous(breaks = int_breaks()) +
   facet_wrap(~ proposal_type, scales = "free_y") +
   labs(x = NULL, y = NULL,
        title = "Number of Commission proposals over time",
-       subtitle = "By year of proposal and type") +
+       subtitle = "By year of proposal and type (excluding the thinly-recorded recommendations)") +
   theme_mo() +
   theme(strip.text = element_text(hjust = 0, face = "bold"))
 
 girafe(ggobj = p_props, width_svg = 9, height_svg = 4.5)
 ```
 
-Decisions are by far the most numerous category, while directives are
-the rarest — reflecting their heavier political weight (a directive
-binds Member States as to result but lets them choose form and methods).
+Decisions are by far the most numerous category. Directives are the
+rarest, reflecting their heavier political weight (a directive binds
+Member States as to result but lets them choose form and methods).
 
 ## Outcomes
 
 Not every proposal makes it into the EU's legal corpus. Many are
-withdrawn before adoption — sometimes because of Council deadlock,
+withdrawn before adoption, sometimes because of Council deadlock and
 sometimes because the Commission has decided to redraft.
 
 ```{r prop-outcomes, echo=FALSE, fig.height=4, fig.width=9}
 outcomes <- props_master |>
   filter(source_data == "euprops",  # outcome status only reliable for EUPROPS
          !is.na(proposed),
-         proposal_type %in% c("Regulation", "Directive", "Decision", "Recommendation")) |>
+         proposal_type %in% c("Regulation", "Directive", "Decision")) |>
   mutate(year = as.integer(format(proposed, "%Y")),
          outcome = case_when(
            !is.na(adopted)                 ~ "Adopted",
@@ -302,7 +307,7 @@ outcomes <- props_master |>
            withdrawn == "replaced"         ~ "Replaced",
            withdrawn == "not adopted"      ~ "Not adopted",
            withdrawn == "repealed"         ~ "Repealed",
-           TRUE                            ~ "Other / pending"
+           TRUE                            ~ "Other or pending"
          )) |>
   filter(year >= 1980, year <= year_now) |>
   count(year, outcome) |>
@@ -312,7 +317,7 @@ outcomes <- props_master |>
   mutate(outcome = factor(outcome,
                           levels = c("Adopted", "Withdrawn", "Replaced",
                                      "Rejected", "Not adopted", "Repealed",
-                                     "Other / pending")))
+                                     "Other or pending")))
 
 p_outcomes <- ggplot(outcomes, aes(x = year, y = share, fill = outcome,
                                    tooltip = paste0(outcome, ": ", n, " (", year, ")"),
@@ -324,7 +329,7 @@ p_outcomes <- ggplot(outcomes, aes(x = year, y = share, fill = outcome,
                                Rejected       = mo_palette$categorical[1],
                                `Not adopted`  = mo_palette$categorical[7],
                                Repealed       = mo_palette$categorical[2],
-                               `Other / pending` = mo_palette$categorical[8])) +
+                               `Other or pending` = mo_palette$categorical[8])) +
   scale_y_continuous(labels = scales::percent, expand = c(0, 0)) +
   scale_x_continuous(expand = c(0, 0)) +
   labs(x = NULL, y = NULL, fill = NULL,
@@ -335,45 +340,8 @@ p_outcomes <- ggplot(outcomes, aes(x = year, y = share, fill = outcome,
 girafe(ggobj = p_outcomes, width_svg = 9, height_svg = 4)
 ```
 
-The vast majority of proposals end up adopted; withdrawal/rejection
+The vast majority of proposals end up adopted; withdrawal and rejection
 shares hover around the low single digits in most years.
-
-## Amending vs new proposals
-
-EUPROPS distinguishes "amending" proposals (which modify an existing
-act) from genuinely new ones. The amending share is a rough indicator
-of how much of the legislative effort goes into evolving the existing
-corpus versus opening new fronts.
-
-```{r amending-share, echo=FALSE, fig.height=4, fig.width=9}
-am_share <- props_master |>
-  filter(source_data == "euprops", !is.na(is_amending), !is.na(proposed),
-         proposal_type %in% c("Regulation", "Directive", "Decision")) |>
-  mutate(year = as.integer(format(proposed, "%Y")),
-         category = ifelse(is_amending, "Amending", "New")) |>
-  filter(year >= 1980, year <= year_now) |>
-  count(year, proposal_type, category) |>
-  group_by(year, proposal_type) |>
-  mutate(share = n / sum(n)) |>
-  ungroup()
-
-p_am <- ggplot(am_share, aes(x = year, y = share, fill = category,
-                             tooltip = paste0(category, ": ", n, " (", year, ", ", proposal_type, ")"),
-                             data_id = paste0(category, year, proposal_type))) +
-  ggiraph::geom_col_interactive(show.legend = TRUE) +
-  scale_fill_manual(values = c(Amending = mo_palette$categorical[6],
-                               New      = mo_palette$categorical[5])) +
-  scale_y_continuous(labels = scales::percent, expand = c(0, 0)) +
-  scale_x_continuous(expand = c(0, 0)) +
-  facet_wrap(~ proposal_type, ncol = 1, scales = "fixed") +
-  labs(x = NULL, y = NULL, fill = NULL,
-       title = "Amending vs new Commission proposals",
-       subtitle = "Share by year and proposal type, EUPROPS-curated data (1980-2022)") +
-  theme_mo() +
-  theme(strip.text = element_text(hjust = 0, face = "bold"))
-
-girafe(ggobj = p_am, width_svg = 9, height_svg = 6)
-```
 
 # Legislative efficiency
 
@@ -441,7 +409,7 @@ girafe(ggobj = p_outliers, width_svg = 9, height_svg = 5)
 ```
 
 EUPROPS lets us separate amending proposals (modifying an existing act)
-from new ones — a control that wasn't possible with raw Eur-Lex data.
+from new ones, a control that wasn't possible with raw Eur-Lex data.
 
 ```{r efficiency-regression, echo=FALSE}
 days_ms <- days_master |>
@@ -466,37 +434,11 @@ modelsummary::modelsummary(
 
 Adding the amending flag to the type controls shows that amending
 proposals do not move significantly faster than new ones once type is
-held constant — contrary to a common intuition that "just tweaking an
+held constant, contrary to a common intuition that "just tweaking an
 existing act" should be quicker. The Member-State coefficient is stable
 across specifications: each additional Member State adds a few days to
 average adoption time.
 
-## Proposals that produced more than one act
-
-A small but interesting share of proposals are split during the
-legislative procedure and yield multiple adopted acts. EUPROPS records
-this explicitly (`adoptedlaws` column, ";"-separated). We expose it as
-a long table in `data-final/proposal_acts.parquet` so each linkage is a
-row.
-
-```{r multi-act, echo=FALSE}
-multi <- prop_acts |>
-  count(proposal_celex, euprop_id, name = "n_acts") |>
-  filter(n_acts > 1) |>
-  arrange(desc(n_acts)) |>
-  left_join(props_master |> select(euprop_id, title, proposed, proposal_type),
-            by = "euprop_id") |>
-  transmute(
-    `EUPROPID`     = euprop_id,
-    `Proposal CELEX` = proposal_celex,
-    `Proposed`     = proposed,
-    `Type`         = proposal_type,
-    `# acts`       = n_acts,
-    `Title`        = str_squish(str_remove(title, "\\(?Text with EEA relevance\\)?"))
-  )
-
-dt_mo(multi)
-```
 
 # Legal bases
 
@@ -576,7 +518,7 @@ p_deleg <- ggplot(deleg_prop_time, aes(x = act_year, y = prop, fill = delegated)
 p_deleg
 ```
 
-Most legal acts adopted by the EU are delegated and implementing acts —
+Most legal acts adopted by the EU are delegated and implementing acts,
 based on another piece of legislation rather than directly on a Treaty.
 
 # Cite

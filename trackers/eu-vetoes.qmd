@@ -36,7 +36,7 @@ veto_data <- veto_data |>
 # Freshness meta: use the date of the LATEST reported veto rather than
 # the CSV's mtime. CI checkout resets file mtimes to the run time, so
 # mtime would show "fresh" every nightly render even if nobody added a
-# new veto in months — misleading. The most-recent veto date is the
+# new veto in months, misleading. The most-recent veto date is the
 # honest signal for "is this dataset current?".
 latest_veto_date <- max(as.Date(veto_data$date_veto), na.rm = TRUE)
 veto_meta <- list(
@@ -74,7 +74,7 @@ veto_data |>
     Date    = as.Date(date_veto),
     Vetoer  = ms_veto,
     Issue   = issue,
-    Country = ifelse(issue_country == "", "—", issue_country),
+    Country = ifelse(issue_country == "", "", issue_country),
     Source  = sprintf('<a href="%s" target="_blank">link</a>', source)
   ) |>
   dt_mo(escape = FALSE)
@@ -87,8 +87,8 @@ Member State in recent history. In contrast, quite a few Member States
 have not had a single veto attributed to them. However, by relying on
 reported vetoes only, this statistic likely underestimates the true
 prevalence of vetoes. Another source of underestimation are long-standing
-vetoes: certain issues might not even be put on the Council agenda — and
-are therefore less likely to be reported — when one or several countries
+vetoes: certain issues might not even be put on the Council agenda (and
+are therefore less likely to be reported) when one or several countries
 had vetoed the policy in question in the past.^[An example here is the
 opening of accession negotiations between the EU and (North) Macedonia,
 which was blocked by Greece for over a decade until a dispute over the
@@ -105,7 +105,7 @@ p_a <- ggplot(df_a, aes(x = reorder(ms_veto, n), y = n,
                         data_id = ms_veto)) +
   geom_col_interactive(show.legend = FALSE) +
   scale_fill_identity() +
-  scale_y_continuous(n.breaks = 8, expand = c(0, 0.1)) +
+  scale_y_continuous(breaks = int_breaks(8), expand = c(0, 0.1)) +
   labs(x = NULL, y = "Total number of vetoes",
        title = "Number of vetoes by Member State") +
   theme_mo() +
@@ -127,7 +127,7 @@ of the High Representative for Foreign and Security Affairs by the Lisbon
 Treaty has generated more opportunities for Member States to veto joint
 EU statements on foreign policy issues.
 
-This is also a reminder that not all vetoes are the same — blocking a
+This is also a reminder that not all vetoes are the same. Blocking a
 legislative measure such as the harmonization of minimum corporate tax is
 arguably much more consequential than the wording of a non-binding
 declaration.
@@ -180,7 +180,7 @@ true level of disagreement among Member States.
 # Veto issues and third countries
 
 We can also categorize the vetoes by what substantive issue they
-concerned and — because vetoes are frequently about foreign affairs —
+concerned and (since vetoes are frequently about foreign affairs) by
 the third country in question. Multiple vetoes have related to progress
 in negotiating the accession of a candidate country outside the EU. Not
 all vetoes are directly linked to a third country; this is especially
@@ -206,7 +206,8 @@ p_c <- ggplot(df_c, aes(x = n, y = reorder(issue, sum))) +
   ggiraph::scale_fill_brewer_interactive(palette = "Paired", type = "qual") +
   # Add a small left-side data padding so bars don't start flush against
   # the y-axis labels; visually separates the label column from the bars.
-  scale_x_continuous(expand = expansion(mult = c(0.04, 0.04))) +
+  scale_x_continuous(expand = expansion(mult = c(0.04, 0.04)),
+                     breaks = int_breaks()) +
   theme_mo() +
   # Smaller, right-aligned y labels with explicit tick padding. The
   # element_text margin alone wasn't shifting positions in ggiraph's
