@@ -16,9 +16,6 @@ website:
     image: assets/og-image.svg
     image-width: 1200
     image-height: 630
-  twitter-card:
-    creator: "@MichalOvadek"
-    image: assets/og-image.svg
   # Lets readers flag mistakes in the data interpretation or the qmd
   # directly via GitHub. "issue" links open a new issue prefilled with
   # the page URL so triaging is easy.

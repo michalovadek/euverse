@@ -102,7 +102,7 @@ careful "data, not narrative" framing.
 
 The `_quarto.yml` already sets `open-graph: true` but there's no
 `og:image` for any page. When a tracker URL is shared on
-Twitter/Mastodon/LinkedIn, it shows the bare URL.
+Mastodon, Bluesky, or LinkedIn, it shows the bare URL.
 
 **Approach:** Add a `R/build_og_images.R` that renders a 1200×630 PNG
 per tracker page using a stripped-down `theme_mo()` ggplot — title,
