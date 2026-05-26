@@ -23,17 +23,23 @@ register_ggiraph_defaults()
 
 fmt_n <- function(x) format(x, big.mark = ",")
 
-# Load 4 snapshots + shared eu_member_states.
+# Load 4 nightly snapshots + 2 derived data-final masters.
 acts_meta       <- read_with_freshness("eurlex_acts")
 force_meta      <- read_with_freshness("eurlex_acts_force")
 proposals_meta  <- read_with_freshness("eurlex_proposals")
 lbs_meta        <- read_with_freshness("eurlex_lbs")
 ms              <- arrow::read_parquet(here::here("data-final", "eu_member_states.parquet"))
+# proposals_master: EUPROPS-trusted historical proposals (1958-2022) +
+# Eur-Lex tail (post-2022). Carries proposal_type, is_amending, adopted
+# date, withdrawn status — all of which the raw Eur-Lex proposals
+# snapshot lacks. See R/build_proposals_master.R for the merge logic.
+props_master  <- arrow::read_parquet(here::here("data-final", "proposals_master.parquet"))
+prop_acts     <- arrow::read_parquet(here::here("data-final", "proposal_acts.parquet"))
 
-acts      <- acts_meta$data
-acts_force<- force_meta$data
-proposals <- proposals_meta$data
-lbs       <- lbs_meta$data
+acts       <- acts_meta$data
+acts_force <- force_meta$data
+proposals  <- proposals_meta$data
+lbs        <- lbs_meta$data
 
 today_d  <- Sys.Date()
 year_now <- as.integer(format(today_d, "%Y"))
@@ -210,6 +216,12 @@ Not all legal acts remain in force indefinitely. According to Eur-Lex, the
 EU has `r mono(fmt_n(sum(acts_force$force == 'true')))` acts
 in force at the moment.
 
+EU law tends to be cumulative: most acts adopted in any given year amend
+or implement an earlier one. Data on this from EUPROPS (a curated
+proposals dataset; see [Cite](#cite)) shows that roughly
+`r mono(paste0(round(100 * mean(props_master$is_amending[!is.na(props_master$is_amending)]), 0), "%"))`
+of Commission proposals on record are amending proposals.
+
 ```{r in-force, echo=FALSE, fig.height=4, fig.width=9}
 in_force_clean <- acts_force |>
   filter(force == "true") |>
@@ -231,28 +243,163 @@ p_inforce <- ggplot(in_force_clean,
 p_inforce
 ```
 
+# Proposals
+
+Behind every adopted act is at least one Commission proposal. The
+[EUPROPS dataset](https://www.michalovadek.github.io/) (curated through
+2022) corrects systematic errors in Eur-Lex's proposal metadata; we
+combine it with the nightly Eur-Lex pull for the post-2022 tail. Total
+proposals in scope: `r mono(fmt_n(nrow(props_master)))`, of which
+`r mono(fmt_n(sum(!is.na(props_master$adopted))))` led to at least one
+adopted act and
+`r mono(fmt_n(sum(props_master$withdrawn %in% c('withdrawn', 'rejected', 'not adopted', 'replaced'))))`
+were withdrawn, rejected, replaced, or never adopted.
+
+```{r prop-by-type, echo=FALSE, fig.height=4.5, fig.width=9}
+props_yearly <- props_master |>
+  filter(!is.na(proposed),
+         proposal_type %in% c("Regulation", "Directive", "Decision", "Recommendation")) |>
+  mutate(year = as.integer(format(proposed, "%Y"))) |>
+  filter(year >= 1958, year <= year_now) |>
+  count(year, proposal_type)
+
+p_props <- ggplot(props_yearly,
+                  aes(x = year, y = n, fill = proposal_type,
+                      tooltip = paste0(proposal_type, ": ", n, " proposals (", year, ")"),
+                      data_id = paste0(proposal_type, year))) +
+  geom_col_interactive(show.legend = FALSE) +
+  scale_fill_manual(values = mo_palette$categorical[1:4]) +
+  facet_wrap(~ proposal_type, scales = "free_y") +
+  labs(x = NULL, y = NULL,
+       title = "Number of Commission proposals over time",
+       subtitle = "By year of proposal and type") +
+  theme_mo() +
+  theme(strip.text = element_text(hjust = 0, face = "bold"))
+
+girafe(ggobj = p_props, width_svg = 9, height_svg = 4.5)
+```
+
+Decisions are by far the most numerous category, while directives are
+the rarest — reflecting their heavier political weight (a directive
+binds Member States as to result but lets them choose form and methods).
+
+## Outcomes
+
+Not every proposal makes it into the EU's legal corpus. Many are
+withdrawn before adoption — sometimes because of Council deadlock,
+sometimes because the Commission has decided to redraft.
+
+```{r prop-outcomes, echo=FALSE, fig.height=4, fig.width=9}
+outcomes <- props_master |>
+  filter(source_data == "euprops",  # outcome status only reliable for EUPROPS
+         !is.na(proposed),
+         proposal_type %in% c("Regulation", "Directive", "Decision", "Recommendation")) |>
+  mutate(year = as.integer(format(proposed, "%Y")),
+         outcome = case_when(
+           !is.na(adopted)                 ~ "Adopted",
+           withdrawn == "withdrawn"        ~ "Withdrawn",
+           withdrawn == "rejected"         ~ "Rejected",
+           withdrawn == "replaced"         ~ "Replaced",
+           withdrawn == "not adopted"      ~ "Not adopted",
+           withdrawn == "repealed"         ~ "Repealed",
+           TRUE                            ~ "Other / pending"
+         )) |>
+  filter(year >= 1980, year <= year_now) |>
+  count(year, outcome) |>
+  group_by(year) |>
+  mutate(share = n / sum(n)) |>
+  ungroup() |>
+  mutate(outcome = factor(outcome,
+                          levels = c("Adopted", "Withdrawn", "Replaced",
+                                     "Rejected", "Not adopted", "Repealed",
+                                     "Other / pending")))
+
+p_outcomes <- ggplot(outcomes, aes(x = year, y = share, fill = outcome,
+                                   tooltip = paste0(outcome, ": ", n, " (", year, ")"),
+                                   data_id = paste0(outcome, year))) +
+  ggiraph::geom_col_interactive(show.legend = TRUE) +
+  scale_fill_manual(values = c(Adopted        = mo_palette$categorical[3],
+                               Withdrawn      = mo_palette$categorical[6],
+                               Replaced       = mo_palette$categorical[5],
+                               Rejected       = mo_palette$categorical[1],
+                               `Not adopted`  = mo_palette$categorical[7],
+                               Repealed       = mo_palette$categorical[2],
+                               `Other / pending` = mo_palette$categorical[8])) +
+  scale_y_continuous(labels = scales::percent, expand = c(0, 0)) +
+  scale_x_continuous(expand = c(0, 0)) +
+  labs(x = NULL, y = NULL, fill = NULL,
+       title = "Outcome of Commission proposals over time",
+       subtitle = "Share of proposals by status, EUPROPS-curated data (1980-2022)") +
+  theme_mo()
+
+girafe(ggobj = p_outcomes, width_svg = 9, height_svg = 4)
+```
+
+The vast majority of proposals end up adopted; withdrawal/rejection
+shares hover around the low single digits in most years.
+
+## Amending vs new proposals
+
+EUPROPS distinguishes "amending" proposals (which modify an existing
+act) from genuinely new ones. The amending share is a rough indicator
+of how much of the legislative effort goes into evolving the existing
+corpus versus opening new fronts.
+
+```{r amending-share, echo=FALSE, fig.height=4, fig.width=9}
+am_share <- props_master |>
+  filter(source_data == "euprops", !is.na(is_amending), !is.na(proposed),
+         proposal_type %in% c("Regulation", "Directive", "Decision")) |>
+  mutate(year = as.integer(format(proposed, "%Y")),
+         category = ifelse(is_amending, "Amending", "New")) |>
+  filter(year >= 1980, year <= year_now) |>
+  count(year, proposal_type, category) |>
+  group_by(year, proposal_type) |>
+  mutate(share = n / sum(n)) |>
+  ungroup()
+
+p_am <- ggplot(am_share, aes(x = year, y = share, fill = category,
+                             tooltip = paste0(category, ": ", n, " (", year, ", ", proposal_type, ")"),
+                             data_id = paste0(category, year, proposal_type))) +
+  ggiraph::geom_col_interactive(show.legend = TRUE) +
+  scale_fill_manual(values = c(Amending = mo_palette$categorical[6],
+                               New      = mo_palette$categorical[5])) +
+  scale_y_continuous(labels = scales::percent, expand = c(0, 0)) +
+  scale_x_continuous(expand = c(0, 0)) +
+  facet_wrap(~ proposal_type, ncol = 1, scales = "fixed") +
+  labs(x = NULL, y = NULL, fill = NULL,
+       title = "Amending vs new Commission proposals",
+       subtitle = "Share by year and proposal type, EUPROPS-curated data (1980-2022)") +
+  theme_mo() +
+  theme(strip.text = element_text(hjust = 0, face = "bold"))
+
+girafe(ggobj = p_am, width_svg = 9, height_svg = 6)
+```
+
 # Legislative efficiency
 
 The image of the EU as an unwieldy bureaucracy is widespread. Let's use
-Eur-Lex data to find out how long it normally takes to pass legislation.
+EUPROPS-corrected dates (more reliable than raw Eur-Lex for older
+proposals) to find out how long it normally takes to pass legislation.
 
 ```{r efficiency, echo=FALSE}
-acts_days <- acts |>
-  filter(!is.na(date), !is.na(proposal)) |>
-  left_join(proposals, by = c("proposal" = "celex")) |>
-  mutate(days = as.integer(as.Date(date) - as.Date(date_proposal))) |>
-  filter(days > -1) |>
-  group_by(celex) |>
-  filter(days == max(days)) |>
-  ungroup() |>
-  distinct(celex, .keep_all = TRUE) |>
-  arrange(date) |>
-  mutate(year_adopted = as.integer(str_sub(date, 1, 4))) |>
-  filter(year_adopted > 1985,
-         type %in% c("Regulation", "Directive", "Decision"))
+# Days from proposal to adoption, drawn from EUPROPS where both dates
+# are present. EUPROPS dates are the curated source of truth, so we no
+# longer need the acts + proposals join + min-date scramble the old
+# Eur-Lex-only pipeline used. Restrict to the 3 main act types since
+# recommendations are too few for stable inference.
+days_master <- props_master |>
+  filter(source_data == "euprops",
+         !is.na(proposed), !is.na(adopted),
+         proposal_type %in% c("Regulation", "Directive", "Decision")) |>
+  mutate(days         = as.integer(adopted - proposed),
+         year_adopted = as.integer(format(adopted, "%Y"))) |>
+  filter(days > 0, year_adopted > 1985)
 
-outliers <- acts_days |>
-  group_by(type) |>
+# Outliers = > 2.9× the within-type mean. Used for both the scatter plot
+# below AND excluded from the regression (so the model isn't driven by
+# 20-year-stuck files).
+outliers <- days_master |>
+  group_by(proposal_type) |>
   mutate(mean = mean(days), coef = days / mean) |>
   filter(coef > 2.9) |>
   ungroup()
@@ -262,61 +409,54 @@ outliers <- acts_days |>
 outliers_top <- outliers |>
   arrange(desc(days)) |>
   slice(1:50) |>
-  select(-any_of("recent_title")) |>
-  left_join(acts |> select(celex, recent_title), by = "celex") |>
-  # The snapshot only carries titles for the top-50 newest acts. The
-  # "most slowly adopted" outliers are mostly old, so recent_title is
-  # NA for most of them and the tooltip falls back to a bare CELEX.
-  # Fetch titles for any missing ones at render time (≤50 calls,
-  # cached by Quarto's freeze).
-  mutate(recent_title = ifelse(
-    is.na(recent_title),
-    purrr::map_chr(
-      celex,
-      ~ tryCatch(
-          as.character(eurlex::elx_fetch_data(
-            paste0("http://publications.europa.eu/resource/celex/", .x), "title"))[1],
-          error = function(e) NA_character_)
-    ),
-    recent_title
-  )) |>
-  mutate(recent_title = str_squish(str_remove(recent_title, "\\(?Text with EEA relevance\\)?")),
-         tooltip = ifelse(is.na(recent_title) | recent_title == "",
-                          paste0(celex, ": ", days, " days"),
-                          paste0(recent_title, " (", days, " days)")),
-         data_id = celex)
+  mutate(title_clean = str_squish(str_remove(title, "\\(?Text with EEA relevance\\)?")),
+         tooltip = ifelse(is.na(title_clean) | title_clean == "",
+                          paste0(euprop_id, ": ", days, " days"),
+                          paste0(title_clean, " (", days, " days, ",
+                                 ifelse(is_amending, "amending", "new"), ")")),
+         data_id = euprop_id,
+         category = ifelse(is_amending, "Amending", "New"))
 
-p_outliers <- ggplot(outliers_top, aes(x = as.Date(date), y = days, fill = type, colour = type,
-                                       tooltip = tooltip, data_id = data_id)) +
-  geom_point_interactive(alpha = 0.6, size = 2.5, show.legend = TRUE) +
+p_outliers <- ggplot(outliers_top,
+                     aes(x = adopted, y = days,
+                         fill = proposal_type, colour = proposal_type,
+                         shape = category,
+                         tooltip = tooltip, data_id = data_id)) +
+  geom_point_interactive(alpha = 0.7, size = 2.7, show.legend = TRUE) +
   geom_hline(yintercept = c(3650, 7300), lty = 2, colour = "grey75") +
   annotate("text", y = c(3650 + 110, 7300 + 110), x = as.Date("2012-01-01"),
            label = c("10 years", "20 years"),
            colour = "grey50", fontface = "italic") +
   scale_fill_manual(values = mo_palette$categorical[1:3]) +
   scale_colour_manual(values = mo_palette$categorical[1:3]) +
+  scale_shape_manual(values = c(Amending = 24, New = 21)) +
   labs(x = "Date of adoption", y = "Days to adoption",
        title = "The most slowly adopted acts in EU history",
-       subtitle = "Number of days between initial Commission proposal and adoption",
-       caption = "Hover over points for title",
-       fill = NULL, colour = NULL) +
+       subtitle = "Days between Commission proposal and adoption (EUPROPS-curated dates)",
+       caption = "Hover over points for title; triangles = amending proposals, circles = new",
+       fill = NULL, colour = NULL, shape = NULL) +
   theme_mo()
 
 girafe(ggobj = p_outliers, width_svg = 9, height_svg = 5)
 ```
 
-```{r efficiency-regression, echo=FALSE}
-days_ms <- acts_days |>
-  filter(!celex %in% outliers$celex) |>
-  left_join(ms_count, by = c("year_adopted" = "year")) |>
-  mutate(type = relevel(as.factor(type), ref = "Decision"))
+EUPROPS lets us separate amending proposals (modifying an existing act)
+from new ones — a control that wasn't possible with raw Eur-Lex data.
 
-m_ms      <- lm(days ~ n_ms, data = days_ms)
-m_full    <- lm(days ~ n_ms + type, data = days_ms)
+```{r efficiency-regression, echo=FALSE}
+days_ms <- days_master |>
+  filter(!euprop_id %in% outliers$euprop_id) |>
+  left_join(ms_count, by = c("year_adopted" = "year")) |>
+  mutate(proposal_type = relevel(as.factor(proposal_type), ref = "Decision"),
+         amending      = ifelse(is_amending, "amending", "new"))
+
+m_ms       <- lm(days ~ n_ms, data = days_ms)
+m_with_typ <- lm(days ~ n_ms + proposal_type, data = days_ms)
+m_full     <- lm(days ~ n_ms + proposal_type + amending, data = days_ms)
 
 suppressPackageStartupMessages(library(modelsummary))
 modelsummary::modelsummary(
-  list("Baseline" = m_ms, "With type controls" = m_full),
+  list("Baseline" = m_ms, "+ Type" = m_with_typ, "+ Amending flag" = m_full),
   statistic  = "conf.int",
   conf_level = 0.95,
   stars      = TRUE,
@@ -324,8 +464,39 @@ modelsummary::modelsummary(
 )
 ```
 
-Controlling for type, the model suggests that for every additional Member
-State, the EU takes on average a few days longer to adopt a legal act.
+Adding the amending flag to the type controls shows that amending
+proposals do not move significantly faster than new ones once type is
+held constant — contrary to a common intuition that "just tweaking an
+existing act" should be quicker. The Member-State coefficient is stable
+across specifications: each additional Member State adds a few days to
+average adoption time.
+
+## Proposals that produced more than one act
+
+A small but interesting share of proposals are split during the
+legislative procedure and yield multiple adopted acts. EUPROPS records
+this explicitly (`adoptedlaws` column, ";"-separated). We expose it as
+a long table in `data-final/proposal_acts.parquet` so each linkage is a
+row.
+
+```{r multi-act, echo=FALSE}
+multi <- prop_acts |>
+  count(proposal_celex, euprop_id, name = "n_acts") |>
+  filter(n_acts > 1) |>
+  arrange(desc(n_acts)) |>
+  left_join(props_master |> select(euprop_id, title, proposed, proposal_type),
+            by = "euprop_id") |>
+  transmute(
+    `EUPROPID`     = euprop_id,
+    `Proposal CELEX` = proposal_celex,
+    `Proposed`     = proposed,
+    `Type`         = proposal_type,
+    `# acts`       = n_acts,
+    `Title`        = str_squish(str_remove(title, "\\(?Text with EEA relevance\\)?"))
+  )
+
+dt_mo(multi)
+```
 
 # Legal bases
 

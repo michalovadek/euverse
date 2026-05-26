@@ -1,6 +1,6 @@
 {
   "source": "proposal_acts",
-  "built_at": "2026-05-26T09:48:06Z",
+  "built_at": "2026-05-26T10:10:13Z",
   "inputs": "data-final/proposals_master.parquet",
   "builder_script": "R/build_proposal_acts.R",
   "rows": 25965,

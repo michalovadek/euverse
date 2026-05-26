@@ -82,23 +82,43 @@ euprops <- euprops |>
     )
   )
 
+# ---- 4b. Harmonised act-type taxonomy --------------------------------------
+# Map EUPROPS's proposal type vocabulary onto the same 4 categories the
+# rest of the site uses for ACTS (see R/celex.R::celex_act_type), so a
+# downstream chart can split proposals and acts by the same axis.
+# Recommendations ARE in EUPROPS: precommend (Commission-proposed) +
+# recc (Commission-issued, not a proposal per se but kept here for
+# completeness). All "mod*" / "prep*" / "comm*" type prefixes feed into
+# the underlying act-type via their suffix (preg -> Regulation, etc.).
+euprops <- euprops |>
+  mutate(
+    proposal_type = case_when(
+      type %in% c("preg",  "modpreg",  "prepreg",  "commpreg",  "commreg")        ~ "Regulation",
+      type %in% c("pdir",  "modpdir",  "prepdir",  "commdir")                     ~ "Directive",
+      type %in% c("pdec",  "modpdec",  "prepdec",  "commpdec")                    ~ "Decision",
+      type %in% c("precommend", "recc", "precc", "precommend ")                   ~ "Recommendation",
+      TRUE                                                                          ~ "Other"
+    )
+  )
+
 # ---- 5. Compact schema (12 cols, semantically grouped) ----------------------
 euprops_clean <- euprops |>
   transmute(
     proposal_celex,
-    euprop_id   = EUPROPID,
-    source_org  = source,           # COM / SEC / JC / JAI / COUNCIL / BCE / C / LET
-    type,                           # EUPROPS taxonomy (preg, pdec, modpreg, ...)
+    euprop_id     = EUPROPID,
+    source_org    = source,           # COM / SEC / JC / JAI / COUNCIL / BCE / C / LET
+    type,                             # EUPROPS taxonomy (preg, pdec, modpreg, ...)
+    proposal_type,                    # Harmonised: Regulation / Directive / Decision / Recommendation / Other
     is_amending,
-    proposed    = prop_d,
-    adopted     = adop_d,
-    withdrawn,                      # "" / "withdrawn" / "rejected" / "not adopted" / ...
+    proposed      = prop_d,
+    adopted       = adop_d,
+    withdrawn,                        # "" / "withdrawn" / "rejected" / "not adopted" / ...
     title,
-    legalbase,                      # legal base as proposed
-    adoptedlb,                      # legal base as adopted (often differs)
-    firstlaw,                       # first adopted-act CELEX (may be NA)
-    adoptedlaws,                    # ;-separated full list of adopted acts
-    source_data = "euprops"
+    legalbase,                        # legal base as proposed
+    adoptedlb,                        # legal base as adopted (often differs)
+    firstlaw,                         # first adopted-act CELEX (may be NA)
+    adoptedlaws,                      # ;-separated full list of adopted acts
+    source_data   = "euprops"
   )
 
 # ---- 6. Append Eur-Lex tail for proposals after EUPROPS cutoff --------------
@@ -129,6 +149,7 @@ eurlex_clean <- eurlex_raw |>
     euprop_id      = NA_character_,
     source_org     = celex_source_org(celex),
     type           = NA_character_,   # Eur-Lex doesn't carry EUPROPS taxonomy
+    proposal_type  = NA_character_,   # Unknown — would need title-fetch per row
     is_amending    = NA,
     proposed       = date_proposal,
     adopted        = as.Date(NA),
