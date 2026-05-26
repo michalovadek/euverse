@@ -83,6 +83,28 @@ int_breaks <- function(n = 5) {
   }
 }
 
+date_breaks_min3 <- function(n = 6) {
+  # Break function for date axes that ALWAYS returns at least 3 ticks
+  # regardless of the data range. Default scales::breaks_pretty drops
+  # to 1 tick (e.g. just "2026") for ranges shorter than ~18 months,
+  # which leaves the reader without context. This function tries
+  # pretty_breaks(n) first and, if it returns <3 ticks, falls back to
+  # an explicit width-based break: 2 months for very narrow ranges,
+  # 6 months / year / 5-year for progressively wider ones. Pair with
+  # scales::label_date_short so the format adapts (year-only when
+  # year-level, YYYY-MM when month-level).
+  function(x) {
+    breaks <- scales::breaks_pretty(n = n)(x)
+    if (length(breaks) >= 3) return(breaks)
+    range_d <- as.numeric(diff(range(x)))
+    width <- if (range_d <= 400)  "2 months"
+             else if (range_d <= 1500) "6 months"
+             else if (range_d <= 4000) "1 year"
+             else                       "5 years"
+    scales::breaks_width(width)(x)
+  }
+}
+
 register_ggiraph_defaults <- function() {
   ggiraph::set_girafe_defaults(
     opts_hover = ggiraph::opts_hover(
