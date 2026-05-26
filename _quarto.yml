@@ -23,12 +23,26 @@ website:
   repo-actions: [issue, source]
   back-to-top-navigation: true
   page-navigation: true
-  # Top navbar is intentionally minimal: the site title (top-left) links
-  # to home, and the search box sits top-right. All page navigation
-  # lives in the docked left sidebar below so the visual hierarchy reads
-  # like a book chapter list rather than a website menu.
+  # Top navbar: site title links to home (top-left), top-level tabs to
+  # each tracker page (left), search and repo-actions (right). The
+  # docked sidebar below mirrors this navigation in book-chapter style,
+  # but the navbar tabs give a quick top-of-page shortcut so the
+  # ribbon doesn't read as empty.
   navbar:
     search: true
+    left:
+      - href: home.qmd
+        text: Home
+      - href: trackers/eu-finance.qmd
+        text: Finance
+      - href: trackers/eu-vetoes.qmd
+        text: Vetoes
+      - href: trackers/eu-court.qmd
+        text: Court
+      - href: trackers/eu-law.qmd
+        text: Law
+      - href: trackers/eu-enlargement.qmd
+        text: Enlargement
   sidebar:
     style: docked
     align: left
