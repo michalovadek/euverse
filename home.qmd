@@ -2,7 +2,6 @@
 title: "euverse"
 subtitle: "Public-data dashboards on European Union institutions, refreshed every night"
 toc: false
-page-layout: full
 ---
 
 ```{r setup, include=FALSE}

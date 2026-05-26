@@ -57,6 +57,13 @@ format:
     include-in-header: assets/header.html
     toc: false
     smooth-scroll: true
+    # Tweak the page grid so the content column is wider and the
+    # docked sidebar narrower, which visually centres the article
+    # body between the sidebar (left) and the TOC margin (right).
+    grid:
+      sidebar-width: 220px
+      body-width: 900px
+      margin-width: 240px
 
 execute:
   freeze: auto

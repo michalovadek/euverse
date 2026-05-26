@@ -164,24 +164,22 @@ The ECB's primary mandate is price stability, with a long-term inflation
 target of 2% year-on-year.
 
 ```{r rates-and-inflation, echo=FALSE, fig.height=4.5, fig.width=8.5}
-# Join the two series on a daily-frequency axis so geom_step produces a
-# continuous line. The previous version used vec_fill_missing on per-series
-# data frames; if either source started later than 1998 the fill left a
-# leading NA gap that filter(!is.na) then dropped, creating a visible
-# discontinuity where the two series didn't share a start date. Now we
-# join both series onto the SAME daily date scaffold and forward-fill in
-# one pass so each series begins at its own first observation and runs
-# unbroken to today.
-rates_wide <- tibble::tibble(date = seq.Date(min(mrr$data$date, hic$data$date),
+# Build long series for the two indicators. Each series carries its own
+# native frequency (MRR is event-driven, HICP monthly), but we expand
+# each one onto a daily grid via forward-fill so the trajectory shows
+# as a continuous line rather than as disconnected horizontal bars
+# (the prior geom_step_interactive version left visible breaks where
+# segments crossed panel boundaries). geom_line_interactive on the
+# daily-filled data renders the same step pattern as a single
+# polyline per series, which is the trajectory the chart depicts.
+rates_long <- tibble::tibble(date = seq.Date(min(mrr$data$date, hic$data$date),
                                              today_d, by = "day")) |>
   left_join(mrr$data |> rename(mrr_pct = rate_pct), by = "date") |>
   left_join(hic$data |> rename(hicp_pct = yoy_pct), by = "date") |>
   arrange(date) |>
   mutate(`ECB main refinancing rate`    = vctrs::vec_fill_missing(mrr_pct, direction = "down"),
          `HICP year-on-year inflation`  = vctrs::vec_fill_missing(hicp_pct, direction = "down")) |>
-  select(date, `ECB main refinancing rate`, `HICP year-on-year inflation`)
-
-rates_long <- rates_wide |>
+  select(date, `ECB main refinancing rate`, `HICP year-on-year inflation`) |>
   tidyr::pivot_longer(cols = -date, names_to = "series", values_to = "value") |>
   filter(!is.na(value))
 
@@ -199,7 +197,7 @@ p_rates <- ggplot(rates_long,
                       data_id = series)) +
   geom_hline(yintercept = 0, colour = "grey80") +
   geom_hline(yintercept = 2, colour = "grey50", linetype = 2) +
-  geom_step_interactive(linewidth = 0.35, show.legend = FALSE) +
+  geom_line_interactive(linewidth = 0.45, show.legend = FALSE) +
   scale_y_continuous(labels = function(x) paste0(x, "%")) +
   scale_x_date(breaks = scales::breaks_pretty(n = 6),
                labels = scales::label_date_short(format = c("%Y", "%m", "%d"))) +

@@ -19,6 +19,11 @@ mo_palette <- list(
   # same as PL — HU is now a distinguishable green #436F4D drawn from the
   # Hungarian flag's middle stripe). EA is a neutral grey for aggregate
   # reference lines.
+  # Hand-picked per ISO-2. The flag of Slovenia is white-blue-red
+  # horizontal stripes, so we use the middle-stripe blue rather than
+  # the previous teal-green (which was confusingly close to the Italian
+  # / Bulgarian / Irish greens and matched no actual element of the
+  # Slovenian flag).
   ms_flags = c(
     AT = "#ED2939", BE = "#FAE042", BG = "#00966E", HR = "#FF0000",
     CY = "#DFAF2C", CZ = "#11457E", DK = "#D1001F", EE = "#0072CE",
@@ -26,7 +31,7 @@ mo_palette <- list(
     HU = "#436F4D", IE = "#169B62", IT = "#009246", LV = "#990000",
     LT = "#FDB913", LU = "#00A1DE", MT = "#C8102E", NL = "#FF4F00",
     PL = "#DC143C", PT = "#FF0000", RO = "#002B7F", SK = "#0B4EA2",
-    SI = "#009B77", ES = "#AA151B", SE = "#FECC00", GB = "#00247D",
+    SI = "#2376B3", ES = "#AA151B", SE = "#FECC00", GB = "#00247D",
     EA = "#666666"
   )
 )
