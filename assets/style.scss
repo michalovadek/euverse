@@ -5,6 +5,31 @@ $font-family-base: $font-family-sans-serif !default;
 $headings-font-weight: 700 !default;
 
 /*-- scss:rules --*/
+// Quarto puts the docked sidebar OUTSIDE .quarto-container as a
+// sibling element. Inside the container, the .page-columns grid
+// applies but has zero flex on the left (it expects the sidebar to
+// have already eaten the screen-start flex). So the body content
+// sits flush against the sidebar and all the slack on a wide screen
+// falls on the right - "weirdly to the left" from the reader's POV.
+//
+// Fix: force the .page-columns grid to have symmetric flex columns
+// on both sides of the body content. The sidebar (sibling) keeps
+// its fixed position; this only changes how the REMAINING horizontal
+// space is distributed within the container.
+.quarto-container.page-columns {
+  grid-template-columns:
+    [screen-start] 1.5em
+    [screen-start-inset] 5fr
+    [body-start-outset] minmax(35px, 0fr)
+    [body-start] 1.5em
+    [body-content-start] minmax(450px, calc(var(--bs-quarto-body-width, 900px) - 3em))
+    [body-content-end] 1.5em
+    [body-end] minmax(35px, 0fr)
+    [body-end-outset] 5fr
+    [screen-end-inset] 1.5em
+    [screen-end] !important;
+}
+
 // Plot/table containers blend with page bg in both light and dark modes
 // (avoids a white rectangle on the dark theme around ggiraph SVGs).
 .cell-output-display > img,
