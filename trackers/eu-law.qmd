@@ -434,10 +434,32 @@ EU law. Looking at the most-invoked legal bases gives insight into EU
 legislative activity.
 
 ```{r lbs-data, echo=FALSE}
+# Acts that cite at least one treaty-based legal basis. A treaty LB
+# has a CELEX starting with "1" (sector 1 = treaties) and ending in
+# a digit or punctuation (i.e. it carries an article number, not just
+# the bare treaty acronym).
+acts_treaty <- lbs |>
+  filter(!is.na(celex), !is.na(lbcelex)) |>
+  filter(str_detect(lbcelex, "^1.*([0-9]|[[:punct:]])$")) |>
+  distinct(celex)
+
 lbs_clean <- lbs |>
   filter(!is.na(celex), !is.na(lbcelex)) |>
+  # Canonicalise CELEXes of consolidated Treaty versions: each
+  # consolidated edition (12010, 12012, 12016, …) gets a different
+  # CELEX even when it refers to the same article. Map them all to
+  # the post-Lisbon canonical "12008" (TFEU / TEU) so that "Article
+  # 114 TFEU" is one row rather than N rows split by edition.
+  # Likewise the 2006 consolidated edition of the pre-Lisbon TEC
+  # ("12006") maps back to "12002" (TEC canonical).
   mutate(
-    delegated = ifelse(str_detect(lbcelex, "^1.*([:digit:]|[:punct:])$"), "primary", "delegated"),
+    lbcelex = str_replace(lbcelex, "^1201[0-9](?=[EM])", "12008"),
+    lbcelex = str_replace(lbcelex, "^12006(?=[EM])",     "12002"),
+  ) |>
+  # Drop bare-treaty rows (lbcelex ending in a letter, no article ref).
+  filter(!str_detect(lbcelex, "^1.*[A-Z]$")) |>
+  mutate(
+    delegated = ifelse(celex %in% acts_treaty$celex, "primary", "delegated"),
     act_year  = as.integer(str_sub(celex, 2, 5)),
     lb_year   = as.integer(str_sub(lbcelex, 2, 5))
   )
@@ -476,6 +498,7 @@ lisbon_lbs <- lbs_clean |>
   mutate(art_num    = as.integer(str_extract(lbcelex, "(?<=E|M)[0-9]+")),
          art_treaty = ifelse(str_detect(lbcelex, "^12008E"), "TFEU", "TEU"),
          `Treaty article` = paste0("Article ", art_num, " ", art_treaty)) |>
+  arrange(desc(n)) |>
   transmute(`Treaty article`, `CELEX` = lbcelex, `Times invoked` = n)
 
 dt_mo(lisbon_lbs)
