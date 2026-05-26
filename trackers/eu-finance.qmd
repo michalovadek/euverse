@@ -166,24 +166,33 @@ The ECB's primary mandate is price stability, with a long-term inflation
 target of 2% year-on-year.
 
 ```{r rates-and-inflation, echo=FALSE, fig.height=4.5, fig.width=8.5}
-# Build long series for the two indicators. Each series carries its own
-# native frequency (MRR is event-driven, HICP monthly), but we expand
-# each one onto a daily grid via forward-fill so the trajectory shows
-# as a continuous line rather than as disconnected horizontal bars
-# (the prior geom_step_interactive version left visible breaks where
-# segments crossed panel boundaries). geom_line_interactive on the
-# daily-filled data renders the same step pattern as a single
-# polyline per series, which is the trajectory the chart depicts.
-rates_long <- tibble::tibble(date = seq.Date(min(mrr$data$date, hic$data$date),
-                                             today_d, by = "day")) |>
-  left_join(mrr$data |> rename(mrr_pct = rate_pct), by = "date") |>
-  left_join(hic$data |> rename(hicp_pct = yoy_pct), by = "date") |>
-  arrange(date) |>
-  mutate(`ECB main refinancing rate`    = vctrs::vec_fill_missing(mrr_pct, direction = "down"),
-         `HICP year-on-year inflation`  = vctrs::vec_fill_missing(hicp_pct, direction = "down")) |>
-  select(date, `ECB main refinancing rate`, `HICP year-on-year inflation`) |>
-  tidyr::pivot_longer(cols = -date, names_to = "series", values_to = "value") |>
-  filter(!is.na(value))
+# Combine the two indicators in their NATIVE frequency (MRR is event-
+# driven, HICP monthly) and let geom_step draw the trajectory. The
+# previous version daily-filled the data and used geom_line_interactive,
+# which made ggiraph render ~700 separate polyline segments per series
+# (instead of one continuous line per series), producing the visual
+# fragmentation the reader sees. Event data + plain geom_step gives
+# one clean step line per series.
+rates_long <- bind_rows(
+  mrr$data |> transmute(date = as.Date(date),
+                        series = "ECB main refinancing rate",
+                        value = rate_pct),
+  hic$data |> transmute(date = as.Date(date),
+                        series = "HICP year-on-year inflation",
+                        value = yoy_pct)
+) |>
+  filter(!is.na(value)) |>
+  arrange(series, date)
+
+# Extend each series to today so the step line carries the last value
+# to the right edge of the plot. Without this the step terminates at
+# the last observation date with a gap to the panel border.
+rates_long <- rates_long |>
+  group_by(series) |>
+  group_modify(~ if (max(.x$date) < today_d) {
+    bind_rows(.x, tibble::tibble(date = today_d, value = tail(.x$value, 1)))
+  } else .x) |>
+  ungroup()
 
 # y range for the zoom panel, set explicitly so the inner panel rescales
 # to the values that actually appear in the last 12 months instead of
@@ -192,14 +201,20 @@ rates_recent <- rates_long |> filter(date >= today_d - 365)
 zoom_ylim <- range(rates_recent$value, na.rm = TRUE) + c(-0.3, 0.3)
 
 p_rates <- ggplot(rates_long,
-                  aes(x = date, y = value,
-                      colour = series,
-                      tooltip = paste0(series, ": ", round(value, 2), "% (",
-                                       format(date, "%Y-%m"), ")"),
-                      data_id = series)) +
+                  aes(x = date, y = value, colour = series)) +
   geom_hline(yintercept = 0, colour = "grey80") +
   geom_hline(yintercept = 2, colour = "grey50", linetype = 2) +
-  geom_line_interactive(linewidth = 0.45, show.legend = FALSE) +
+  # geom_step (non-interactive) gives one continuous polyline per
+  # series. Interactivity lives on geom_point_interactive below,
+  # which only renders at actual observations so tooltip targets
+  # match the data the reader is looking at.
+  geom_step(linewidth = 0.45, show.legend = FALSE) +
+  geom_point_interactive(
+    aes(tooltip = paste0(series, ": ", round(value, 2), "% (",
+                         format(date, "%Y-%m"), ")"),
+        data_id = paste0(series, format(date, "%Y-%m-%d"))),
+    size = 0.9, alpha = 0.7, show.legend = FALSE
+  ) +
   scale_y_continuous(labels = function(x) paste0(x, "%")) +
   scale_x_date(breaks = date_breaks_min3(),
                labels = scales::label_date_short(format = c("%Y", "%m", "%d"))) +

@@ -5,6 +5,22 @@ $font-family-base: $font-family-sans-serif !default;
 $headings-font-weight: 700 !default;
 
 /*-- scss:rules --*/
+// Sidebar section-header (e.g. "Trackers") rendered the collapse
+// chevron flushed to the far right of the sidebar column, which on
+// our 220 px-wide sidebar made it sit ~150 px away from its label.
+// Pull the chevron right up against the label so the affordance is
+// visually attached to "Trackers".
+.sidebar-item.sidebar-item-section > .sidebar-item-container {
+  justify-content: flex-start !important;
+}
+.sidebar-item.sidebar-item-section > .sidebar-item-container > .sidebar-item-text {
+  flex: 0 0 auto !important;
+}
+.sidebar-item.sidebar-item-section > .sidebar-item-container > .sidebar-item-toggle {
+  flex: 0 0 auto !important;
+  margin-left: 0 !important;
+}
+
 // Quarto puts the docked sidebar OUTSIDE .quarto-container as a
 // sibling element. Inside the container, the .page-columns grid
 // applies but has zero flex on the left (it expects the sidebar to
