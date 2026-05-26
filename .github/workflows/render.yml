@@ -37,18 +37,23 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v4.3.1
+      # All third-party actions use floating major-version tags
+      # (@v2/@v4/@v5) so patches + security fixes auto-apply with no
+      # manual bumping. Rare failure mode: when a maintainer publishes
+      # a fresh tagged release, codeload.github.com can briefly return
+      # 500 to runners for that SHA while it propagates through
+      # GitHub's action-cache nodes (happened 2026-05-26 with
+      # r-lib/actions v2.12.0 + quarto-actions v2.2.0; resolved on its
+      # own in a few hours). If you need an immediate workaround
+      # before it resolves, temporarily pin the offending action to
+      # the PRIOR tag in the same major line (e.g. setup-r@v2.11.4),
+      # then revert the pin once the cache catches up. Tag lists:
+      #   https://github.com/r-lib/actions/tags
+      #   https://github.com/quarto-dev/quarto-actions/tags
+      - uses: actions/checkout@v4
 
-      # IMPORTANT: pin r-lib/actions to an explicit version, NOT @v2.
-      # On 2026-05-26 v2.12.0 (= the latest at the time, and what @v2
-      # was resolving to) had a codeload.github.com archive that
-      # returned "Internal server error" on download, killing every
-      # workflow run at "Set up job" in ~3 seconds. v2.11.4 has a
-      # different SHA and a reachable archive. If a future bump
-      # produces the same symptom, just pin to whatever the prior
-      # stable tag was. List of tags: https://github.com/r-lib/actions/tags
       - name: Setup R
-        uses: r-lib/actions/setup-r@v2.11.4
+        uses: r-lib/actions/setup-r@v2
         with:
           r-version: '4.4.3'
           use-public-rspm: true
@@ -69,10 +74,10 @@ jobs:
 
       # Caches based on hash of renv.lock; runs renv::restore() automatically.
       - name: Restore renv
-        uses: r-lib/actions/setup-renv@v2.11.4
+        uses: r-lib/actions/setup-renv@v2
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@v5.4.2
+        uses: astral-sh/setup-uv@v5
         with:
           version: '0.10.7'
           enable-cache: true
@@ -84,10 +89,7 @@ jobs:
         run: uv sync --frozen --no-install-project
 
       - name: Setup Quarto
-        # v2.2.0 had an unreachable codeload archive on 2026-05-26 (same
-        # pattern as r-lib/actions/v2.12.0). v2.1.9 is the prior stable
-        # release and its archive is reachable.
-        uses: quarto-dev/quarto-actions/setup@v2.1.9
+        uses: quarto-dev/quarto-actions/setup@v2
         with:
           version: '1.7.17'
 
@@ -148,7 +150,7 @@ jobs:
         run: quarto render
 
       - name: Upload _site as Pages artifact
-        uses: actions/upload-pages-artifact@v3.0.1
+        uses: actions/upload-pages-artifact@v3
         with:
           path: _site/
 
@@ -168,7 +170,7 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4.0.5
+        uses: actions/deploy-pages@v4
 
   # ----------------------------------------------------------------------------
   # VERIFY — fetch the live site after deploy and confirm each tracker URL
