@@ -39,8 +39,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # IMPORTANT: pin r-lib/actions to an explicit version, NOT @v2.
+      # On 2026-05-26 v2.12.0 (= the latest at the time, and what @v2
+      # was resolving to) had a codeload.github.com archive that
+      # returned "Internal server error" on download, killing every
+      # workflow run at "Set up job" in ~3 seconds. v2.11.4 has a
+      # different SHA and a reachable archive. If a future bump
+      # produces the same symptom, just pin to whatever the prior
+      # stable tag was. List of tags: https://github.com/r-lib/actions/tags
       - name: Setup R
-        uses: r-lib/actions/setup-r@v2.12.0
+        uses: r-lib/actions/setup-r@v2.11.4
         with:
           r-version: '4.4.3'
           use-public-rspm: true
@@ -61,7 +69,7 @@ jobs:
 
       # Caches based on hash of renv.lock; runs renv::restore() automatically.
       - name: Restore renv
-        uses: r-lib/actions/setup-renv@v2.12.0
+        uses: r-lib/actions/setup-renv@v2.11.4
 
       - name: Setup uv
         uses: astral-sh/setup-uv@v5
