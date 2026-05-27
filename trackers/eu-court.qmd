@@ -25,10 +25,55 @@ register_ggiraph_defaults()
 fmt_n <- function(x) format(x, big.mark = ",")
 
 # Load snapshots once at the top.
-cc  <- read_with_freshness("curia_cases")
+#
+# Data sources (in current priority order):
+#   1. eurlex_cases             - PRIMARY. SPARQL-derived case-existence
+#                                 list (one row per court x year x case
+#                                 number). Authoritative for 2025-Oct
+#                                 onwards and complete enough for all
+#                                 earlier years (~95-99% overlap with
+#                                 Curia, see below).
+#   2. eurlex_court_decisions   - PRIMARY. Per-decision facts (ECLI,
+#                                 procedure, formation, rapporteur).
+#   3. curia_cases              - LEGACY SUPPLEMENT. Curia's static
+#                                 case-list pages (c1/c2/t2/f1_juris.htm)
+#                                 stopped being refreshed by curia.europa.eu
+#                                 on 2025-10-20 and Wayback shows the
+#                                 live response has actually regressed
+#                                 from where it briefly was in November.
+#                                 We keep reading it so we still get
+#                                 the few dozen cases per year that
+#                                 EUR-Lex misses (no OJ-C notice yet)
+#                                 plus the case_info / case_status /
+#                                 ecli enrichment columns Curia has and
+#                                 EUR-Lex doesn't. Page is built to
+#                                 render correctly even if curia data
+#                                 disappears entirely (empty fallback
+#                                 below).
 elc <- read_with_freshness("eurlex_cases")
 ed  <- read_with_freshness("eurlex_court_decisions")
 ms  <- arrow::read_parquet(here::here("data-final", "eu_member_states.parquet"))
+
+curia_empty <- function() {
+  list(
+    data = tibble::tibble(
+      case_id = character(), ecli = character(), court = character(),
+      see_case = character(), see_case_court = character(),
+      appeal = character(), appeal_court = character(),
+      case_status = character(),
+      case_year = integer(), case_number = integer(),
+      decision_year = integer(),
+      decision_date_str = character(), case_info = character()
+    ),
+    meta = NULL
+  )
+}
+cc <- tryCatch(read_with_freshness("curia_cases"),
+               error = function(e) {
+                 message("curia_cases unavailable: ", conditionMessage(e),
+                         " - page will render from EUR-Lex sources only")
+                 curia_empty()
+               })
 
 today_d  <- Sys.Date()
 year_now <- as.integer(format(today_d, "%Y"))
@@ -36,30 +81,23 @@ year_now <- as.integer(format(today_d, "%Y"))
 curia_cases <- cc$data
 decisions   <- ed$data
 
-# Case-existence master: union of Curia (legacy) + EUR-Lex.
+# Case-existence master: EUR-Lex primary, Curia supplemental.
 #
-# Curia's static c1/c2/t2/f1_juris.htm pages stopped being refreshed by
-# Curia on 2025-10-20 - no 2026 entries and the live response has even
-# regressed to omit late-2025 cases C-671/25 through ~C-709/25 that
-# briefly appeared. EUR-Lex covers the same cases via OJ C notices
-# (CELEX types CN/TN/FN, published when a case is lodged) and via
-# decision celexes. Take the union: each row is a distinct CJEU case
-# (court x year x case_number).
-#
-# Set arithmetic on 2020-2024 confirms ~95-99% overlap, with Curia
-# slightly more complete for years before its freeze (a few dozen
-# cases without an EUR-Lex OJ-C notice yet) and EUR-Lex catching the
-# entire post-October-2025 tail Curia misses.
+# Each row is a distinct CJEU case (court x year x case_number). The
+# union picks up the small overlap gap (a few dozen cases per year
+# without a published OJ-C notice) from Curia while not depending on
+# it. When curia_cases is empty (parquet missing or fetcher disabled),
+# cases_master is exactly the EUR-Lex case-existence list.
 cases_master <- dplyr::bind_rows(
+  elc$data |>
+    transmute(case_id, court, case_year, case_number,
+              case_status = NA_character_, src = "eurlex"),
   curia_cases |>
     filter(!is.na(case_year), !is.na(case_number), !is.na(court)) |>
     transmute(case_id, court, case_year, case_number,
-              case_status, src = "curia"),
-  elc$data |>
-    transmute(case_id, court, case_year, case_number,
-              case_status = NA_character_, src = "eurlex")
+              case_status, src = "curia")
 ) |>
-  # Where both sources cover the same case, keep curia's row (has case_status).
+  # Preserve Curia's case_status when both sources cover the same case.
   arrange(court, case_year, case_number, dplyr::desc(src == "curia")) |>
   distinct(court, case_year, case_number, .keep_all = TRUE)
 
@@ -73,15 +111,22 @@ ms_panel <- tibble(year = 1952:year_now) |>
 # Yearly count of MS for parity with the eu-law port's reuse pattern.
 n_ms_by_year <- ms_panel |> count(year, name = "n_ms")
 
-# Inline-stats: caseload totals.
+# Inline-stats: caseload totals (all derived from EUR-Lex primary
+# sources, with Curia status used opportunistically when present).
 #
-# n_cases / n_pending derive from cases_master (union of Curia + EUR-Lex)
-# so the totals stay correct even after Curia's freeze. Pending is
-# computed by set arithmetic: registered cases minus cases that have a
-# decision celex in EUR-Lex minus cases marked Removal/Transferred by
-# Curia. Withdrawal data isn't published in EUR-Lex so for cases lodged
-# after Curia's freeze (2025-10-20) we slightly overcount pending, but
-# CJEU withdrawal rates are low (<~5% of lodged cases).
+# Pending is set-difference: registered cases minus cases that have
+# any "decided" signal from EUR-Lex (decision celex) or from Curia
+# (case_status in {Judgment, Order, Opinion, Removal, Transferred,
+# Seizure order, Re-examination, Third-party proceedings}).
+#
+# IMPORTANT: we restrict the pending window to the last 5 case-years
+# (PENDING_WINDOW_YR). CJEU cases rarely span more than 4 years end
+# to end, and EUR-Lex's decision-celex coverage thins out for cases
+# from the 1950s-1990s, which would otherwise show up as "pending"
+# just because their celex is missing. The 5-year cutoff matches the
+# 99th percentile of Curia's historical Pending status.
+PENDING_WINDOW_YR <- 5L
+
 decided_keys <- decisions |>
   mutate(court = dplyr::case_when(clx_court == "C" ~ "CJ",
                                   clx_court == "T" ~ "GC",
@@ -90,21 +135,25 @@ decided_keys <- decisions |>
   filter(!is.na(court), !is.na(clx_year), !is.na(case_number)) |>
   distinct(court, case_year = clx_year, case_number)
 
-withdrawn_keys <- curia_cases |>
-  filter(case_status %in% c("Removal", "Transferred"),
+resolved_curia <- curia_cases |>
+  filter(case_status %in% c("Judgment", "Order", "Opinion", "Removal",
+                            "Transferred", "Seizure order",
+                            "Re-examination", "Third-party proceedings"),
          !is.na(court), !is.na(case_year), !is.na(case_number)) |>
   distinct(court, case_year, case_number)
 
-cases_open <- cases_master |>
-  filter(!is.na(court), !is.na(case_year), !is.na(case_number)) |>
+pending_master <- cases_master |>
+  filter(case_year >= year_now - PENDING_WINDOW_YR,
+         !is.na(court), !is.na(case_year), !is.na(case_number)) |>
   anti_join(decided_keys,   by = c("court", "case_year", "case_number")) |>
-  anti_join(withdrawn_keys, by = c("court", "case_year", "case_number"))
+  anti_join(resolved_curia, by = c("court", "case_year", "case_number"))
 
-n_cases       <- nrow(cases_master |>
-                        filter(case_status != "Transferred" | is.na(case_status)))
-n_decisions   <- curia_cases |> filter(!is.na(ecli)) |> summarise(n = n_distinct(ecli)) |> pull(n)
-n_pending_cj  <- sum(cases_open$court == "CJ")
-n_pending_gc  <- sum(cases_open$court == "GC")
+n_cases      <- nrow(cases_master |>
+                       filter(case_status != "Transferred" | is.na(case_status)))
+n_decisions  <- decisions |> filter(!is.na(ecli), ecli != "") |>
+  summarise(n = n_distinct(ecli)) |> pull(n)
+n_pending_cj <- sum(pending_master$court == "CJ")
+n_pending_gc <- sum(pending_master$court == "GC")
 
 # Court palette mapped to mo_palette$categorical[1:3] (replaces old bespoke pink/navy/teal).
 court_palette <- tibble(
@@ -141,7 +190,11 @@ currently pending before the Court of Justice and
 `r mono(fmt_n(n_pending_gc))` before the General Court.
 
 ```{r freshness, results='asis', echo=FALSE}
-freshness_badge_combined(list(cc$meta, elc$meta, ed$meta))
+# Freshness badge reports the EUR-Lex sources only (primary). The Curia
+# fetcher's fetched_at would always look fresh because the cron runs
+# nightly, but the upstream HTML hasn't been refreshed since 2025-10-20
+# and is no longer a useful freshness signal for readers.
+freshness_badge_combined(list(elc$meta, ed$meta))
 ```
 
 ```{r recent-cj-cases, echo=FALSE}
