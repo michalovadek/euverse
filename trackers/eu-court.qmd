@@ -26,6 +26,7 @@ fmt_n <- function(x) format(x, big.mark = ",")
 
 # Load snapshots once at the top.
 cc  <- read_with_freshness("curia_cases")
+elc <- read_with_freshness("eurlex_cases")
 ed  <- read_with_freshness("eurlex_court_decisions")
 ms  <- arrow::read_parquet(here::here("data-final", "eu_member_states.parquet"))
 
@@ -34,6 +35,33 @@ year_now <- as.integer(format(today_d, "%Y"))
 
 curia_cases <- cc$data
 decisions   <- ed$data
+
+# Case-existence master: union of Curia (legacy) + EUR-Lex.
+#
+# Curia's static c1/c2/t2/f1_juris.htm pages stopped being refreshed by
+# Curia on 2025-10-20 - no 2026 entries and the live response has even
+# regressed to omit late-2025 cases C-671/25 through ~C-709/25 that
+# briefly appeared. EUR-Lex covers the same cases via OJ C notices
+# (CELEX types CN/TN/FN, published when a case is lodged) and via
+# decision celexes. Take the union: each row is a distinct CJEU case
+# (court x year x case_number).
+#
+# Set arithmetic on 2020-2024 confirms ~95-99% overlap, with Curia
+# slightly more complete for years before its freeze (a few dozen
+# cases without an EUR-Lex OJ-C notice yet) and EUR-Lex catching the
+# entire post-October-2025 tail Curia misses.
+cases_master <- dplyr::bind_rows(
+  curia_cases |>
+    filter(!is.na(case_year), !is.na(case_number), !is.na(court)) |>
+    transmute(case_id, court, case_year, case_number,
+              case_status, src = "curia"),
+  elc$data |>
+    transmute(case_id, court, case_year, case_number,
+              case_status = NA_character_, src = "eurlex")
+) |>
+  # Where both sources cover the same case, keep curia's row (has case_status).
+  arrange(court, case_year, case_number, dplyr::desc(src == "curia")) |>
+  distinct(court, case_year, case_number, .keep_all = TRUE)
 
 # Year x Member State panel from the shared master.
 ms_panel <- tibble(year = 1952:year_now) |>
@@ -46,10 +74,37 @@ ms_panel <- tibble(year = 1952:year_now) |>
 n_ms_by_year <- ms_panel |> count(year, name = "n_ms")
 
 # Inline-stats: caseload totals.
-n_cases       <- curia_cases |> filter(case_status != "Transferred" | is.na(case_status)) |> summarise(n = n_distinct(case_id)) |> pull(n)
+#
+# n_cases / n_pending derive from cases_master (union of Curia + EUR-Lex)
+# so the totals stay correct even after Curia's freeze. Pending is
+# computed by set arithmetic: registered cases minus cases that have a
+# decision celex in EUR-Lex minus cases marked Removal/Transferred by
+# Curia. Withdrawal data isn't published in EUR-Lex so for cases lodged
+# after Curia's freeze (2025-10-20) we slightly overcount pending, but
+# CJEU withdrawal rates are low (<~5% of lodged cases).
+decided_keys <- decisions |>
+  mutate(court = dplyr::case_when(clx_court == "C" ~ "CJ",
+                                  clx_court == "T" ~ "GC",
+                                  clx_court == "F" ~ "CST"),
+         case_number = suppressWarnings(as.integer(stringr::str_sub(celex, 8, 11)))) |>
+  filter(!is.na(court), !is.na(clx_year), !is.na(case_number)) |>
+  distinct(court, case_year = clx_year, case_number)
+
+withdrawn_keys <- curia_cases |>
+  filter(case_status %in% c("Removal", "Transferred"),
+         !is.na(court), !is.na(case_year), !is.na(case_number)) |>
+  distinct(court, case_year, case_number)
+
+cases_open <- cases_master |>
+  filter(!is.na(court), !is.na(case_year), !is.na(case_number)) |>
+  anti_join(decided_keys,   by = c("court", "case_year", "case_number")) |>
+  anti_join(withdrawn_keys, by = c("court", "case_year", "case_number"))
+
+n_cases       <- nrow(cases_master |>
+                        filter(case_status != "Transferred" | is.na(case_status)))
 n_decisions   <- curia_cases |> filter(!is.na(ecli)) |> summarise(n = n_distinct(ecli)) |> pull(n)
-n_pending_cj  <- curia_cases |> filter(case_status == "Pending", court == "CJ") |> summarise(n = n_distinct(case_id)) |> pull(n)
-n_pending_gc  <- curia_cases |> filter(case_status == "Pending", court == "GC") |> summarise(n = n_distinct(case_id)) |> pull(n)
+n_pending_cj  <- sum(cases_open$court == "CJ")
+n_pending_gc  <- sum(cases_open$court == "GC")
 
 # Court palette mapped to mo_palette$categorical[1:3] (replaces old bespoke pink/navy/teal).
 court_palette <- tibble(
@@ -86,17 +141,23 @@ currently pending before the Court of Justice and
 `r mono(fmt_n(n_pending_gc))` before the General Court.
 
 ```{r freshness, results='asis', echo=FALSE}
-freshness_badge_combined(list(cc$meta, ed$meta))
+freshness_badge_combined(list(cc$meta, elc$meta, ed$meta))
 ```
 
 ```{r recent-cj-cases, echo=FALSE}
-curia_cases |>
+# Recent-cases table joins curia metadata onto cases_master so cases
+# Curia missed (post-freeze) still appear with at least a case id.
+cases_master |>
   filter(court == "CJ") |>
+  left_join(curia_cases |> distinct(case_id, .keep_all = TRUE) |>
+              select(case_id, case_info),
+            by = "case_id") |>
   arrange(desc(case_year), desc(case_number)) |>
   slice(1:50) |>
   transmute(
     `Case ID` = case_id,
-    Info      = case_info
+    Info      = ifelse(is.na(case_info) | case_info == "",
+                       "(awaiting Curia listing)", case_info)
   ) |>
   dt_mo()
 ```
@@ -108,11 +169,14 @@ dramatically over the course of European integration. We can visualise
 the annual caseload of the three EU courts since 1953.
 
 ```{r ncasesyearcourt, echo=FALSE, fig.height=8, fig.width=9}
-n_cases_year_court <- curia_cases |>
+n_cases_year_court <- cases_master |>
   filter(!is.na(court), !is.na(case_year)) |>
-  summarise(n = n_distinct(case_id), .by = c(court, case_year)) |>
-  right_join(tidyr::expand(curia_cases |> filter(!is.na(court), !is.na(case_year)),
-                           court, case_year), by = c("court", "case_year")) |>
+  summarise(n = n_distinct(paste(court, case_year, case_number)),
+            .by = c(court, case_year)) |>
+  right_join(tidyr::expand(cases_master |>
+                             filter(!is.na(court), !is.na(case_year)),
+                           court, case_year),
+             by = c("court", "case_year")) |>
   mutate(n = ifelse(is.na(n), 0L, n)) |>
   left_join(court_palette, by = "court") |>
   group_by(court) |>
@@ -201,46 +265,14 @@ yhat_ols_t1 <- as.integer(round(predict(out_ols, newdat_t1, type = "response"), 
 cj_color <- court_palette$color[court_palette$court == "CJ"]
 
 # Plot: actual bars + 2 dashed-outline prediction bars.
-#
-# Curia's case-list scrape lags upstream by several months for the
-# current year, so n_cases_year_court is often missing a year_now row
-# despite cases being publicly registered. When curia is behind, fall
-# back to eurlex_court_decisions: every decision celex encodes a case
-# year + court + case_number ("62026CJ0024" = case 24 of 2026, CJ).
-# CJEU case numbers are sequential, so the MAX case_number observed
-# in year_now decisions is a tight lower bound on cases lodged so far.
-# This is what makes the actual bar appear inside the dashed year_now
-# prediction bar instead of nothing showing.
+# year_now's actual bar is partial by construction (still mid-year and
+# OJ-C notices for some lodged cases not yet published), which is
+# exactly what makes the partial-fill comparison vs the prediction work.
 plot_dat <- n_cases_year_court |>
-  filter(case_year > year_now - 7, court == "CJ")
-
-if (!any(plot_dat$case_year == year_now)) {
-  cj_partial <- decisions |>
-    filter(clx_court == "C", clx_year == year_now, !is.na(celex)) |>
-    mutate(case_num = suppressWarnings(as.integer(
-      stringr::str_extract(celex, "(?<=[A-Z])[0-9]+")))) |>
-    filter(!is.na(case_num)) |>
-    summarise(max_case = max(case_num, na.rm = TRUE)) |>
-    pull(max_case)
-
-  if (length(cj_partial) == 1L && is.finite(cj_partial) && cj_partial > 0) {
-    plot_dat <- dplyr::bind_rows(plot_dat, tibble::tibble(
-      court       = "CJ",
-      case_year   = year_now,
-      n           = as.integer(cj_partial),
-      color       = cj_color,
-      global_mean = NA_real_
-    ))
-  }
-}
-
-plot_dat <- plot_dat |>
-  mutate(tooltip = ifelse(
-           case_year == year_now,
-           paste0("≥ ", n, " cases lodged so far in ", year_now,
-                  " (lower bound from EUR-Lex case numbers; Curia case list still behind)"),
-           paste0("N = ", n)
-         ),
+  filter(case_year > year_now - 7, court == "CJ") |>
+  mutate(tooltip = paste0("N = ", n,
+                          ifelse(case_year == year_now,
+                                 " (cases lodged so far this year)", "")),
          data_id = paste0("actual", case_year))
 
 p_forecast <- ggplot(plot_dat, aes(x = case_year, y = n)) +
