@@ -24,11 +24,20 @@
 
 suppressPackageStartupMessages({
   library(here); library(eurlex); library(dplyr); library(stringr)
+  library(httr); library(jsonlite)
 })
 source(here::here("R", "freshness.R"))
 source(here::here("R", "celex.R"))
 
 src <- "eurlex_cases"
+
+# Years to backfill English-language case titles for. CJEU cases
+# typically need a recent (last ~3 years) title because Curia's
+# case_info is only stale for cases lodged after its freeze; older
+# cases are well covered by Curia. We pull a couple of pre-freeze
+# years too as a buffer (= 4 calendar years total) to keep the
+# title coverage smoothly transitioning between sources.
+TITLE_BACKFILL_YEARS <- 4L
 
 # ---- 1. fetch ---------------------------------------------------------------
 df <- tryCatch({
@@ -81,6 +90,94 @@ df <- tryCatch({
   message("Fetch failed: ", conditionMessage(e))
   quit(status = 1L)
 })
+
+# ---- 2b. backfill English titles for recent years --------------------------
+# Hits the EUR-Lex SPARQL endpoint directly because the eurlex package
+# wrapper doesn't expose `cdm:expression_title`. The query joins works
+# to their English-language expression and pulls the title literal.
+# Returns ~6,500 rows for a 3-year window in ~20s; scales roughly
+# linearly with the year span.
+year_now <- as.integer(format(Sys.Date(), "%Y"))
+year_lo  <- year_now - (TITLE_BACKFILL_YEARS - 1L)
+year_re  <- paste0("^6", "[0-9]{4}[CTF]")
+# Build a digit-set regex like [4-9] to constrain the year suffix
+# without relying on numeric inequalities (cdm:resource_legal_id_celex
+# is a literal string, not an int).
+year_digits <- as.character(year_lo:year_now)
+year_alt    <- paste(year_digits, collapse = "|")
+clx_filter  <- paste0("^6(", year_alt, ")[CTF]")
+
+title_sparql <- sprintf('
+PREFIX cdm: <http://publications.europa.eu/ontology/cdm#>
+PREFIX lang: <http://publications.europa.eu/resource/authority/language/>
+SELECT DISTINCT ?celex ?title
+WHERE {
+  ?w cdm:resource_legal_id_celex ?celex.
+  FILTER(REGEX(str(?celex), "%s"))
+  ?expr cdm:expression_belongs_to_work ?w.
+  ?expr cdm:expression_uses_language lang:ENG.
+  ?expr cdm:expression_title ?title.
+}', clx_filter)
+
+titles_df <- tryCatch({
+  endpoint <- "http://publications.europa.eu/webapi/rdf/sparql"
+  message("Fetching titles for years ", year_lo, "-", year_now, "...")
+  r <- httr::POST(endpoint,
+                  body = list(query = title_sparql,
+                              format = "application/sparql-results+json"),
+                  encode = "form", httr::timeout(600))
+  if (httr::status_code(r) != 200L) {
+    message("Title SPARQL HTTP ", httr::status_code(r), "; skipping title backfill")
+    return(NULL)
+  }
+  parsed <- jsonlite::fromJSON(
+    httr::content(r, "text", encoding = "UTF-8"), simplifyVector = FALSE
+  )
+  bindings <- parsed$results$bindings
+  message("Title SPARQL returned ", length(bindings), " bindings.")
+  if (length(bindings) == 0L) return(NULL)
+  data.frame(
+    celex = vapply(bindings, function(b) b$celex$value, character(1L)),
+    title = vapply(bindings, function(b) b$title$value, character(1L)),
+    stringsAsFactors = FALSE
+  )
+}, error = function(e) {
+  message("Title backfill failed: ", conditionMessage(e),
+          "; cases parquet will have title=NA")
+  NULL
+})
+
+# Pick one title per case (court x year x case_number). Prefer titles
+# from the case's first_celex when available so the chosen title
+# matches the establishment notice ("Case C-N/YY: ..."); otherwise
+# fall back to any celex's English title for that case.
+df$title <- NA_character_
+if (!is.null(titles_df) && nrow(titles_df) > 0L) {
+  titles_df <- titles_df |>
+    mutate(court_letter = celex_court(celex),
+           case_year    = celex_year(celex),
+           case_number  = suppressWarnings(as.integer(str_sub(celex, 8, 11))),
+           court = dplyr::case_when(court_letter == "C" ~ "CJ",
+                                    court_letter == "T" ~ "GC",
+                                    court_letter == "F" ~ "CST",
+                                    TRUE                ~ NA_character_)) |>
+    filter(!is.na(court), !is.na(case_year), !is.na(case_number))
+
+  # First-celex match (preferred)
+  fc_titles <- titles_df |>
+    select(first_celex = celex, title_fc = title)
+  df <- df |> left_join(fc_titles, by = "first_celex")
+
+  # Fallback: any English title for the case
+  any_titles <- titles_df |>
+    distinct(court, case_year, case_number, .keep_all = TRUE) |>
+    select(court, case_year, case_number, title_any = title)
+  df <- df |> left_join(any_titles, by = c("court", "case_year", "case_number"))
+
+  df$title <- dplyr::coalesce(df$title_fc, df$title_any)
+  df$title_fc  <- NULL
+  df$title_any <- NULL
+}
 
 # ---- 3. validate ------------------------------------------------------------
 if (!is.data.frame(df) || nrow(df) < 10000L) {

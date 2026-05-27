@@ -198,20 +198,30 @@ freshness_badge_combined(list(elc$meta, ed$meta))
 ```
 
 ```{r recent-cj-cases, echo=FALSE}
-# Recent-cases table joins curia metadata onto cases_master so cases
-# Curia missed (post-freeze) still appear with at least a case id.
+# Recent-cases table: prefer Curia's case_info (terse: "Pending Case,
+# Commission / Italy") and fall back to the EUR-Lex notice title for
+# cases Curia hasn't listed yet ("Case C-263/26: Action brought on
+# 30 March 2026 - European Commission v Kingdom of Spain"). EUR-Lex
+# titles already start with "Case C-N/YY:" so strip that prefix to
+# match Curia's column style.
 cases_master |>
   filter(court == "CJ") |>
   left_join(curia_cases |> distinct(case_id, .keep_all = TRUE) |>
               select(case_id, case_info),
             by = "case_id") |>
+  left_join(elc$data |> select(case_id, title),
+            by = "case_id") |>
   arrange(desc(case_year), desc(case_number)) |>
   slice(1:50) |>
-  transmute(
-    `Case ID` = case_id,
-    Info      = ifelse(is.na(case_info) | case_info == "",
-                       "(awaiting Curia listing)", case_info)
+  mutate(
+    eurlex_info = str_remove(title, "^Case [^:]+:\\s*"),
+    info = dplyr::coalesce(
+      dplyr::na_if(case_info, ""),
+      dplyr::na_if(eurlex_info, ""),
+      "(no description available yet)"
+    )
   ) |>
+  transmute(`Case ID` = case_id, Info = info) |>
   dt_mo()
 ```
 
