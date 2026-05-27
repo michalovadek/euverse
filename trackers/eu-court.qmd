@@ -238,7 +238,12 @@ n_cases_year_court <- cases_master |>
   mutate(tooltip = paste0("N = ", n, " (", case_year, ")"),
          data_id = paste0(court, case_year))
 
-p_caseload <- ggplot(n_cases_year_court,
+# Drop year_now from the caseload chart: a partial-year bar next to
+# complete years looks like a 70% caseload collapse to anyone who
+# doesn't read the caption. The forecast chart below specifically
+# handles year_now with a prediction overlay; this chart is for
+# historical comparison only.
+p_caseload <- ggplot(n_cases_year_court |> filter(case_year < year_now),
                      aes(x = case_year, y = n, fill = color)) +
   geom_hline(aes(yintercept = global_mean, colour = color),
              lty = 2, alpha = 0.4, linewidth = 0.4) +
@@ -246,12 +251,12 @@ p_caseload <- ggplot(n_cases_year_court,
                        colour = "grey96") +
   scale_fill_identity() +
   scale_colour_identity() +
-  scale_x_continuous(breaks = seq(1950, year_now + 1, by = 10)) +
+  scale_x_continuous(breaks = seq(1950, year_now, by = 10)) +
   scale_y_continuous(breaks = int_breaks()) +
   facet_wrap(~ court_long, scales = "free_y", ncol = 1) +
   labs(x = NULL, y = NULL,
        title = "Number of cases received by EU courts",
-       subtitle = "Aggregated by year and court",
+       subtitle = paste0("Aggregated by year and court (through ", year_now - 1, ")"),
        caption = "Dashed line shows the mean") +
   theme_mo() +
   theme(strip.text = element_text(hjust = 0, face = "bold"))

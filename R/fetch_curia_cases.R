@@ -1,6 +1,17 @@
 # fetch_curia_cases.R
 # Source: Curia case list scraper via eurlex::elx_curia_list().
-# Returns ~60-80K cases (all CJEU cases since 1953).
+# Returns ~50-80K cases (all CJEU cases since 1953).
+#
+# STATUS (as of 2026-05-27): LEGACY SUPPLEMENTAL DATA.
+#   Curia's static c1/c2/t2/f1_juris.htm pages stopped being refreshed
+#   by curia.europa.eu around 2025-10-20 and the live response has even
+#   regressed - Wayback Machine snapshots show the file briefly held
+#   cases through C-709/25 in November 2025 but the live response today
+#   ends at C-670/25. We keep running this fetcher because Curia still
+#   ships information EUR-Lex doesn't (case_status, case_info, ECLI
+#   mappings) and may resume publishing at some point, but the page
+#   no longer DEPENDS on this fetcher succeeding. See trackers/eu-court.qmd
+#   and docs/eurlex-issue-draft.md for details and EUR-Lex fallback logic.
 #
 # IMPORTANT: We use parse = FALSE to bypass a known bug in
 # eurlex::elx_curia_parse() (extract_first helper drops the

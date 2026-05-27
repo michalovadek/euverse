@@ -269,5 +269,15 @@ helper function as you write it.
       `R/fetch_curia_cases.R`: use `parse = FALSE` + extract ECLI
       manually; see_case/appeal cols set to NA. Fix in package +
       re-enable `parse = TRUE` in the fetcher.
+- [ ] **Curia static-page freeze** discovered 2026-05-27:
+      `c1/c2/t2/f1_juris.htm` have not been refreshed by curia.europa.eu
+      since 2025-10-20; Wayback Machine even shows the live response
+      has regressed from the brief Nov 2025 state. `elx_curia_list`
+      is therefore stuck on stale data. The eu-court tracker now
+      treats Curia as a legacy supplement and reads `eurlex_cases`
+      (sector-6 SPARQL via `R/fetch_eurlex_cases.R`) as primary —
+      see comment header on `R/fetch_curia_cases.R` and the source
+      summary in `trackers/eu-court.qmd`. Issue draft for the
+      eurlex package: `docs/eurlex-issue-draft.md`.
 - [ ] Long-term: extract `R/fetch_eurlex.R` into the `eurlex` package
       itself (owner already maintains it) so other projects benefit.
