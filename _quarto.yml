@@ -43,6 +43,8 @@ website:
         text: Law
       - href: trackers/eu-enlargement.qmd
         text: Enlargement
+      - href: trackers/eu-politics.qmd
+        text: Politics
   sidebar:
     style: docked
     align: left
@@ -62,6 +64,8 @@ website:
             href: trackers/eu-law.qmd
           - text: EU Enlargement
             href: trackers/eu-enlargement.qmd
+          - text: EU Politics
+            href: trackers/eu-politics.qmd
 
 format:
   html:

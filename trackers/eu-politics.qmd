@@ -1,0 +1,282 @@
+---
+title: "Politics of EU Member State Governments"
+subtitle: "Ideological and pro/anti-EU composition of national cabinets, plus the EU as a campaign issue"
+toc: true
+---
+
+```{r setup, include=FALSE}
+suppressPackageStartupMessages({
+  library(dplyr)
+  library(tidyr)
+  library(ggplot2)
+  library(ggiraph)
+  library(here)
+  library(stringr)
+  library(forcats)
+})
+source(here::here("R", "theme.R"))
+source(here::here("R", "freshness.R"))
+source(here::here("R", "table.R"))
+register_ggiraph_defaults()
+
+fmt_n <- function(x) format(x, big.mark = ",")
+
+# Pre-built parquets from R/build_eu_politics.R - regenerated nightly
+# from ParlGov view_cabinet + view_party joined to data-manual/eu-member-states
+# and from the Manifesto Project MPDS dump.
+eg <- arrow::read_parquet(
+  here::here("data-final", "eu_government_composition.parquet")
+)
+em_eu <- arrow::read_parquet(
+  here::here("data-final", "eu_manifesto_eu_stance_eu.parquet")
+)
+em_co <- arrow::read_parquet(
+  here::here("data-final", "eu_manifesto_eu_stance_country.parquet")
+)
+
+# Freshness signals come from the build sidecars (these are derived
+# data, not API snapshots, so use manual_meta).
+eg_meta <- manual_meta(
+  here::here("data-final", "eu_government_composition.parquet"),
+  source_label = "ParlGov view_cabinet + view_party (built nightly)"
+)
+eg_meta$rows <- nrow(eg)
+em_meta <- manual_meta(
+  here::here("data-final", "eu_manifesto_eu_stance_eu.parquet"),
+  source_label = "Manifesto Project MPDS 2024a"
+)
+em_meta$rows <- nrow(em_co)
+
+today_d  <- Sys.Date()
+year_now <- as.integer(format(today_d, "%Y"))
+```
+
+The euverse's other trackers describe what EU governments _do_ - vetoes
+they cast, laws they pass, cases they litigate. This page is about
+_who they are_: the partisan and ideological composition of each
+Member State's national government over time, and how openly the
+parties making up those governments support (or oppose) European
+integration.
+
+Two complementary data sources sit underneath:
+
+- **[ParlGov](https://www.parlgov.org/)** for the factual record of
+  who has been in cabinet, when, and with what share of seats. ParlGov
+  also assigns each party fixed left-right and pro/anti-EU scores
+  (`eu_anti_pro`, 0 = anti-EU, 10 = pro-EU) drawn from expert surveys.
+- **The [Manifesto Project (MPDS)](https://manifesto-project.wzb.eu/)**
+  for what parties actually wrote about Europe in their election
+  manifestos, decade by decade.
+
+```{r freshness, results='asis', echo=FALSE}
+freshness_badge_combined(list(eg_meta, em_meta))
+```
+
+# Pro/anti-EU stance of governments
+
+The heatmap below shows the seat-weighted average pro/anti-EU score of
+each Member State's national cabinet for every year since 1990. Each
+cell is one country-year: warm colours mean a strongly pro-EU
+government, cool colours an openly eurosceptic one. ParlGov scores
+parties on the 0-10 scale and we weight by parliamentary seats, so a
+cabinet whose biggest partner is mildly eurosceptic but whose junior
+partner is strongly pro-EU averages to "neutral".
+
+```{r heatmap, echo=FALSE, fig.height=7.5, fig.width=9}
+# Order countries by their long-run mean eu_anti_pro score so the most
+# eurosceptic cabinets cluster near the top.
+country_order <- eg |>
+  group_by(country) |>
+  summarise(mean = mean(mean_eu_anti_pro, na.rm = TRUE), .groups = "drop") |>
+  arrange(mean) |>
+  pull(country)
+
+eg_plot <- eg |>
+  mutate(country = factor(country, levels = country_order),
+         tooltip = paste0(country, ", ", year, ": ", cabinet_name,
+                          " (EU score ", round(mean_eu_anti_pro, 1),
+                          "/10, left-right ", round(mean_left_right, 1), "/10)"),
+         data_id = paste0(iso2, year))
+
+p_heat <- ggplot(eg_plot,
+                 aes(x = year, y = country, fill = mean_eu_anti_pro,
+                     tooltip = tooltip, data_id = data_id)) +
+  geom_tile_interactive(colour = "white", linewidth = 0.15) +
+  scale_fill_gradient2(
+    low    = "#D55E00", mid = "#F0E442", high = "#0072B2",
+    midpoint = 5, na.value = "grey90",
+    breaks = c(0, 2.5, 5, 7.5, 10),
+    labels = c("Anti-EU (0)", "2.5", "Neutral (5)", "7.5", "Pro-EU (10)"),
+    limits = c(0, 10)
+  ) +
+  scale_x_continuous(breaks = seq(1990, year_now, 5),
+                     expand = c(0, 0)) +
+  scale_y_discrete(expand = c(0, 0)) +
+  labs(x = NULL, y = NULL,
+       title = "Seat-weighted EU stance of national cabinets",
+       subtitle = "Each cell: one Member State in one year, coloured by ParlGov eu_anti_pro of cabinet parties",
+       fill = NULL,
+       caption = "Countries ordered by long-run average. Blank cells = pre-accession (or post-Brexit, for the UK).") +
+  theme_mo() +
+  theme(legend.position    = "bottom",
+        legend.key.width   = unit(2, "cm"),
+        legend.key.height  = unit(0.4, "cm"),
+        panel.grid.major   = element_blank(),
+        axis.text.y        = element_text(size = 8))
+
+girafe(ggobj = p_heat, width_svg = 9, height_svg = 7.5)
+```
+
+ParlGov scores are static per party, so the heatmap captures party
+turnover in cabinet but not within-party shifts: Fidesz, for instance,
+keeps its pre-Orbán "moderately pro-EU" score throughout, understating
+the country's actual euroscepticism since 2010. With that caveat in
+mind, the most strikingly eurosceptic governments since 1990 include
+Italy's Conte-I (Lega + M5S) in 2018-19, the post-2022 Meloni cabinet,
+Slovakia under Fico, and several Bulgarian and Czech coalitions.
+
+# Eurosceptic parties in cabinet
+
+A complementary, less aggregated view: count how many Member States in
+each year had _at least one_ cabinet party scoring below 4 on ParlGov's
+`eu_anti_pro` scale - the standard threshold for openly eurosceptic
+party families.
+
+```{r euroscept-count, echo=FALSE, fig.height=4.5, fig.width=9}
+euroscept_by_year <- eg |>
+  group_by(year) |>
+  summarise(
+    n_total          = dplyr::n(),
+    n_with_eurosc    = sum(has_eurosceptic, na.rm = TRUE),
+    share_with_eurosc = n_with_eurosc / n_total,
+    .groups          = "drop"
+  ) |>
+  mutate(tooltip = paste0(year, ": ", n_with_eurosc, " of ", n_total,
+                          " MS governments include a eurosceptic party"),
+         data_id = as.character(year))
+
+p_es <- ggplot(euroscept_by_year,
+               aes(x = year, y = n_with_eurosc)) +
+  geom_col_interactive(aes(tooltip = tooltip, data_id = data_id),
+                       fill = mo_palette$categorical[6],
+                       colour = "white", linewidth = 0.2) +
+  scale_x_continuous(breaks = seq(1990, year_now, 5), expand = c(0, 0)) +
+  scale_y_continuous(breaks = int_breaks(), expand = expansion(mult = c(0, 0.05))) +
+  labs(x = NULL, y = "Member States",
+       title = "EU governments including at least one eurosceptic party",
+       subtitle = paste0("Counted across all current and historical EU MS in each year ",
+                         "(threshold: a cabinet party with ParlGov eu_anti_pro <= 4)"),
+       caption = "Source: ParlGov + EU MS master.") +
+  theme_mo()
+
+girafe(ggobj = p_es, width_svg = 9, height_svg = 4.5)
+```
+
+# Salience of "Europe" in election manifestos
+
+The Manifesto Project codes every sentence (quasi-sentence) of every
+party's election manifesto into one of ~60 policy categories. Two of
+those categories are explicitly about Europe: **per108**
+("European Community/Union: Positive") and **per110**
+("European Community/Union: Negative"). The chart below plots the
+EU-wide unweighted mean share of manifesto sentences in each category
+per year of national elections, plus the running net (positive minus
+negative).
+
+```{r manifesto-trend, echo=FALSE, fig.height=4.5, fig.width=9}
+em_long <- em_eu |>
+  filter(year >= 1980) |>
+  select(year, Positive = eu_positive_mean, Negative = eu_negative_mean) |>
+  tidyr::pivot_longer(c(Positive, Negative),
+                      names_to = "category", values_to = "mean_share") |>
+  mutate(tooltip = paste0(year, " - ", category, ": ",
+                          round(mean_share, 2), "% of manifesto sentences"),
+         data_id = paste0(category, year))
+
+p_man <- ggplot(em_long,
+                aes(x = year, y = mean_share, colour = category,
+                    fill = category)) +
+  geom_area_interactive(aes(tooltip = tooltip, data_id = data_id),
+                        alpha = 0.55, position = "identity") +
+  geom_line(linewidth = 0.6) +
+  scale_colour_manual(values = c(Positive = mo_palette$categorical[5],
+                                 Negative = mo_palette$categorical[6])) +
+  scale_fill_manual(values = c(Positive = mo_palette$categorical[5],
+                               Negative = mo_palette$categorical[6])) +
+  scale_x_continuous(breaks = seq(1980, year_now, 5), expand = c(0, 0)) +
+  scale_y_continuous(labels = function(x) paste0(x, "%"),
+                     expand = expansion(mult = c(0, 0.05))) +
+  labs(x = NULL, y = "Manifesto share",
+       title = "How much do EU parties talk about Europe?",
+       subtitle = paste0("Annual unweighted mean of pro-EU (per108) and anti-EU (per110) ",
+                         "manifesto categories across EU member-state elections"),
+       colour = NULL, fill = NULL,
+       caption = "Source: Manifesto Project (MPDS 2024a).") +
+  theme_mo()
+
+girafe(ggobj = p_man, width_svg = 9, height_svg = 4.5)
+```
+
+The series tells a familiar story: pro-EU framing rose steadily through
+the Maastricht / single-market era, peaked in the late 1990s, and has
+since drifted down as openly euro-critical campaigning has spread
+across the continent. Note that what's measured is _attention_, not
+endorsement; the rise in negative coverage after 2010 reflects both
+genuinely eurosceptic parties and pro-EU parties responding to them.
+
+# Country-level EU stance over time
+
+The same Manifesto-project measure, but split out by Member State. A
+country whose line drops below zero is one whose election manifestos
+that year, on average, said more negative things about the EU than
+positive ones.
+
+```{r manifesto-country, echo=FALSE, fig.height=8, fig.width=9}
+# Restrict to (a) years where multiple parties wrote manifestos, so the
+# means aren't dominated by a single small party, and (b) a recent
+# window where the EU was already a contested issue.
+em_co_plot <- em_co |>
+  filter(n_parties >= 3, year >= 1995)
+
+# Eurosceptic countries that the user-facing reader is most likely to
+# care about - shown first (top of facet grid).
+notable <- c("United Kingdom", "Hungary", "Poland", "Italy", "France",
+             "Germany", "Greece", "Netherlands", "Denmark", "Sweden",
+             "Austria", "Czechia", "Slovakia", "Spain", "Finland", "Ireland")
+em_co_plot <- em_co_plot |>
+  filter(country %in% notable) |>
+  mutate(country = factor(country, levels = notable),
+         tooltip = paste0(country, " ", year, ": net ",
+                          round(net_pro_eu, 2),
+                          "% (", round(eu_positive, 2), " positive, ",
+                          round(eu_negative, 2), " negative)"),
+         data_id = paste0(iso2, year))
+
+p_co <- ggplot(em_co_plot,
+               aes(x = year, y = net_pro_eu)) +
+  geom_hline(yintercept = 0, colour = "grey60", linewidth = 0.3) +
+  geom_line(colour = mo_palette$categorical[2], linewidth = 0.4) +
+  geom_point_interactive(aes(tooltip = tooltip, data_id = data_id,
+                             colour = net_pro_eu),
+                         size = 1.6) +
+  scale_colour_gradient2(low = mo_palette$categorical[6],
+                         mid = "grey70",
+                         high = mo_palette$categorical[5],
+                         midpoint = 0, guide = "none") +
+  scale_x_continuous(breaks = c(1995, 2005, 2015, 2025)) +
+  facet_wrap(~ country, scales = "free_y", ncol = 4) +
+  labs(x = NULL, y = "Net pro-EU manifesto share",
+       title = "EU as an election issue, by Member State",
+       subtitle = "Vote-weighted mean per108 - per110 per election year; negative = net hostile",
+       caption = "Source: Manifesto Project. Years with <3 parties coded omitted.") +
+  theme_mo() +
+  theme(strip.text = element_text(face = "bold", hjust = 0))
+
+girafe(ggobj = p_co, width_svg = 9, height_svg = 8)
+```
+
+# Cite
+
+Ovádek, M. *Politics of EU Member State Governments*. Accessed
+`r format(today_d, "%d %B %Y")`. Available at
+<https://michalovadek.github.io/euverse/trackers/eu-politics.html>.

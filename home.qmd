@@ -46,6 +46,8 @@ cat(
        "Regulations, directives, decisions, and recommendations adopted by the EU since 1952, plus how long they took to pass."),
   card("trackers/eu-enlargement.html", "EU Enlargement",
        "Membership of the EU from the Founding Six in 1957 to today, traced wave by wave (and the one withdrawal)."),
+  card("trackers/eu-politics.html", "EU Politics",
+       "Ideological and pro/anti-EU composition of national governments since 1990, plus the EU's rise and fall as a campaign topic."),
   sep = "\n"
 )
 ```

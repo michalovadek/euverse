@@ -1,0 +1,7 @@
+{
+  "source": "eu_government_composition",
+  "built_at": "2026-05-28T15:03:38Z",
+  "inputs": "data-external/parlgov/{view_cabinet,view_party} + data-manual/eu-member-states.csv",
+  "builder_script": "R/build_eu_politics.R",
+  "rows": 817
+}
