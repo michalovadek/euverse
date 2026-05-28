@@ -187,10 +187,34 @@ write_with_meta <- function(df, stem, n_inputs_label) {
   message("Built ", stem, ": ", nrow(df), " rows -> ", pq_path)
 }
 
+# Council aggregate: equal-weighted mean across MS that were members
+# in that year. The Council of the EU has one seat per Member State,
+# so country-equal-weighting (not population-weighting) is the natural
+# default. We can't disaggregate by Council formation (ECOFIN, JHA,
+# etc.) because we don't have minister-portfolio-party mapping in
+# ParlGov - this is the "average national government" view.
+council_aggregate <- eu_government |>
+  group_by(year) |>
+  summarise(
+    n_ms_total       = dplyr::n(),
+    n_ms_lr_covered  = sum(!is.na(mean_left_right)),
+    n_ms_eu_covered  = sum(!is.na(mean_eu_anti_pro) & !is.nan(mean_eu_anti_pro)),
+    council_left_right  = mean(mean_left_right,
+                               na.rm = TRUE),
+    council_eu_anti_pro = mean(mean_eu_anti_pro,
+                               na.rm = TRUE),
+    .groups = "drop"
+  )
+
 write_with_meta(
   eu_government,
   "eu_government_composition",
   "data-external/parlgov/{view_cabinet,view_party} + data-manual/eu-member-states.csv"
+)
+write_with_meta(
+  council_aggregate,
+  "eu_council_aggregate",
+  "derived from eu_government_composition (equal-weighted across MS)"
 )
 write_with_meta(
   country_year,

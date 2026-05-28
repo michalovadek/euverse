@@ -1,0 +1,7 @@
+{
+  "source": "eu_council_aggregate",
+  "built_at": "2026-05-28T17:14:54Z",
+  "inputs": "derived from eu_government_composition (equal-weighted across MS)",
+  "builder_script": "R/build_eu_politics.R",
+  "rows": 37
+}

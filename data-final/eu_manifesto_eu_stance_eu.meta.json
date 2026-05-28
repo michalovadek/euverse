@@ -1,6 +1,6 @@
 {
   "source": "eu_manifesto_eu_stance_eu",
-  "built_at": "2026-05-28T15:03:38Z",
+  "built_at": "2026-05-28T17:14:54Z",
   "inputs": "data-external/manifesto/MPDataset_MPDS2024a.csv + data-manual/eu-member-states.csv",
   "builder_script": "R/build_eu_politics.R",
   "rows": 79
