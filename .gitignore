@@ -76,3 +76,10 @@ Thumbs.db
 .idea/
 *.swp
 *~
+
+# --- Local working notes ------------------------------------------------------
+# AGENTS.md is the agent/working-notes file. Kept local-only (untracked) so it
+# can carry laptop-specific paths and in-flight notes without shipping to the
+# public repo. Was tracked through 2026-06-01, then untracked via
+# `git rm --cached`; history retains the old versions.
+AGENTS.md
