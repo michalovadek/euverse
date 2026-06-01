@@ -1,0 +1,40 @@
+name: Keepalive
+
+# GitHub disables scheduled workflows after 60 days with no repository
+# activity, which would silently stop the nightly render+deploy. This checks
+# weekly and, ONLY when the latest commit is older than 40 days, makes a tiny
+# empty commit to reset that 60-day timer. Committing at ~day 42 leaves room
+# for a skipped run or two before day 60. So it adds NO commits while the repo
+# is active and at most roughly one every six weeks during a long quiet spell.
+# The commit changes no files (no repo growth) and carries [skip ci] so it
+# does not trigger the render workflow.
+"on":  # quoted so YAML 1.1 parsers don't read it as the boolean true
+  schedule:
+    - cron: '0 5 * * 1'   # Mondays 05:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: keepalive
+  cancel-in-progress: false
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Empty keepalive commit when the repo is going quiet
+        run: |
+          days=$(( ( $(date +%s) - $(git log -1 --format=%ct) ) / 86400 ))
+          echo "Latest commit was $days day(s) ago."
+          if [ "$days" -lt 40 ]; then
+            echo "Under the 40-day threshold; no keepalive needed."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "chore: keepalive: reset 60-day scheduled-workflow timer [skip ci]"
+          git push
+          echo "Pushed keepalive commit."
