@@ -1488,7 +1488,7 @@
       "RemoteHost": "api.github.com",
       "RemoteUsername": "michalovadek",
       "RemoteRepo": "eurlex",
-      "RemoteRef": "master",
+      "RemoteRef": "ee120000b3b8ce44e36e8cdfa3eb58c6fc151616",
       "RemoteSha": "ee120000b3b8ce44e36e8cdfa3eb58c6fc151616"
     },
     "eurostat": {
