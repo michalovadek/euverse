@@ -531,7 +531,7 @@ n_refs_country <- references |>
             n_refs     = n(), .groups = "drop") |>
   mutate(tooltip = paste0(origin, ": ", n_refs, " references. First case referred in ", year_first, "."))
 
-# ggplot2::map_data + Czech Republic / UK name normalisation
+# ggplot2::map_data + Czech Republic / UK name normalization
 refs_map_dat <- ggplot2::map_data("world",
                                   xlim = c(-10.66, 51.55),
                                   ylim = c(34.5, 71.05)) |>

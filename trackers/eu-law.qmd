@@ -445,7 +445,7 @@ acts_treaty <- lbs |>
 
 lbs_clean <- lbs |>
   filter(!is.na(celex), !is.na(lbcelex)) |>
-  # Canonicalise CELEXes of consolidated Treaty versions: each
+  # Canonicalize CELEXes of consolidated Treaty versions: each
   # consolidated edition (12010, 12012, 12016, …) gets a different
   # CELEX even when it refers to the same article. Map them all to
   # the post-Lisbon canonical "12008" (TFEU / TEU) so that "Article
