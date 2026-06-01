@@ -160,7 +160,7 @@ typical tracker data and avoids the >50 MB warnings.
     (docs-only paths skipped); plus `workflow_dispatch` for manual reruns.
   - Pipeline: `checkout` → **restore `data-apis/` from the Actions cache**
     (last-good fallback, see below) → `setup-r@v2 (4.4.3)` →
-    `setup-renv@v2` (cached on hash of renv.lock) → `setup-uv@v5 (0.10.7,
+    `setup-renv@v2` (cached on hash of renv.lock) → `setup-uv@v7 (0.10.7,
     cached)` → `uv sync --frozen --no-install-project` →
     `setup-quarto@v2 (1.7.17)` → `tests/test_helpers.R` → run every
     `R/fetch_*.R` under `timeout 360` with graceful failure, writing a
@@ -170,7 +170,7 @@ typical tracker data and avoids the >50 MB warnings.
     `build_eu_politics` (page offline), `build_proposal_acts` (unused),
     `build_data_external_parquets` (CI no-op) — are run locally on demand,
     not nightly) → `quarto render` → `upload-pages-artifact@v3` →
-    `deploy-pages@v4` (active) → `verify` job (every sitemap URL → 200).
+    `deploy-pages@v5` (active) → `verify` job (every sitemap URL → 200).
     Job budget: 45 min.
   - **Graceful degradation, on three levels:** (1) each fetcher runs in its
     own `timeout 360 Rscript` invocation; a non-zero exit or timeout emits a
