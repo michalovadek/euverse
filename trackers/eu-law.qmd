@@ -504,6 +504,12 @@ lisbon_lbs <- lbs_clean |>
 dt_mo(lisbon_lbs)
 ```
 
+Treaty articles are not the only possible legal basis. Many acts are
+adopted under powers conferred by earlier EU legislation rather than
+grounded directly in the Treaties. The chart below tracks how the
+balance between primary acts (those citing a Treaty) and delegated acts
+(those citing other EU law) has shifted over time.
+
 ```{r lbs-deleg-time, echo=FALSE, fig.height=4, fig.width=9}
 deleg_prop_time <- lbs_clean |>
   distinct(celex, .keep_all = TRUE) |>
