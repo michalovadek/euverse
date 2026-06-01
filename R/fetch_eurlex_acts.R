@@ -1,7 +1,14 @@
 # fetch_eurlex_acts.R
-# Source: Eur-Lex SPARQL sector 3 (legal acts) with proposal link.
+# Source: Eur-Lex SPARQL sector 3 (legal acts).
 # Includes recent-title fetches for the top-50 newest acts so the
 # eu-law page's "most recent legislation" table works from the snapshot.
+#
+# We deliberately do NOT request include_proposal. That proposal-link join
+# is the heaviest part of the sector-3 query and was timing out in CI: the
+# fetcher succeeded locally but failed every nightly run, leaving the page
+# on a stale fallback snapshot. The column was unused downstream (the
+# proposals analysis builds on EUPROPS via data-final, not on this
+# snapshot), so dropping it costs nothing.
 
 suppressPackageStartupMessages({
   library(here); library(eurlex); library(dplyr); library(stringr); library(purrr)
@@ -13,8 +20,7 @@ src <- "eurlex_acts"
 
 df <- tryCatch({
   raw <- elx_make_query("any", sector = 3,
-                        include_date = TRUE,
-                        include_proposal = TRUE) |>
+                        include_date = TRUE) |>
     elx_run_query() |>
     select(-any_of("work"))
 

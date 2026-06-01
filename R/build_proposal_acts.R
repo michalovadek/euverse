@@ -18,8 +18,8 @@
 #   is_first        — TRUE if this matches EUPROPS's `firstlaw` (i.e. the
 #                     first act produced from the proposal)
 #   source_data     — always "euprops" (this table only carries EUPROPS-known
-#                     linkages; post-cutoff linkages live in eurlex_acts'
-#                     `proposal` column instead)
+#                     linkages; post-cutoff proposal->act links are not
+#                     currently tracked)
 
 suppressPackageStartupMessages({
   library(here); library(dplyr); library(tidyr); library(stringr)
