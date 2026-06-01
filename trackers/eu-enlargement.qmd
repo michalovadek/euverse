@@ -166,7 +166,7 @@ ms_wave |>
   dt_mo()
 ```
 
-# Candidate and potential-candidate countries
+# Candidate countries
 
 The chart and table above only show **current and historical Member
 States**. As of `r format(today_d, "%B %Y")`,
