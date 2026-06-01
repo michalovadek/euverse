@@ -54,15 +54,16 @@ cat(
 
 ## How it works
 
-Every tracker page is a Quarto document that loads a parquet snapshot from
-`data-apis/` and renders the same set of shared `theme_mo()` charts and
-`dt_mo()` tables. A GitHub Actions workflow re-fetches each upstream source
-nightly at 03:17 UTC; if a fetch fails, the page falls back to the previous
-good snapshot and shows a visible "data as of" badge so you always know
-how stale you're looking.
+Each tracker rebuilds itself overnight: a scheduled job re-pulls the
+underlying data and the page re-renders, so the charts reflect what the
+sources say that day. Most of the data comes from public APIs,
+complemented on occasion by additional external or hand-curated sources.
+When a source is unreachable the page falls back to the last good copy
+and shows the date the data was fetched, so you can see how current the
+numbers are.
 
-The full source (fetchers, helpers, qmds, workflow) is at
-[github.com/michalovadek/euverse](https://github.com/michalovadek/euverse).
+The full source is on
+[GitHub](https://github.com/michalovadek/euverse).
 
 ## About
 
