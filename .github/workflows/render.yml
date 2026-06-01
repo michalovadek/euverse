@@ -34,7 +34,7 @@ concurrency:
 jobs:
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       # All third-party actions use floating major-version tags
@@ -51,6 +51,21 @@ jobs:
       #   https://github.com/r-lib/actions/tags
       #   https://github.com/quarto-dev/quarto-actions/tags
       - uses: actions/checkout@v4
+
+      # Restore the last-good data snapshots from the Actions cache (which
+      # lives OUTSIDE the repo, so this adds no git history and the repo never
+      # grows). Each night we restore the most recent cache, fetch fresh over
+      # it, and save it back below — so a fetcher that fails for a stretch
+      # falls back to the LAST SUCCESSFUL fetch rather than to whatever was
+      # last committed. The committed data-apis/ snapshots remain only as a
+      # cold-start bootstrap for the first run / after cache eviction.
+      - name: Restore last-good data snapshots
+        uses: actions/cache/restore@v4
+        with:
+          path: data-apis
+          key: data-apis-${{ github.run_id }}
+          restore-keys: |
+            data-apis-
 
       - name: Setup R
         uses: r-lib/actions/setup-r@v2
@@ -109,37 +124,59 @@ jobs:
         shell: bash
         run: |
           shopt -s nullglob
+          {
+            echo "## Nightly data fetch"
+            echo ""
+            echo "| source | result |"
+            echo "|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
           any=false
           for f in R/fetch_*.R; do
             any=true
-            name=$(basename "$f")
+            name=$(basename "$f" .R)
             echo "::group::$name"
-            if Rscript "$f"; then
+            # OS-level cap per fetcher: the pinned eurlex package's HTTP GET
+            # timeout is ~27h, so one hung socket could otherwise consume the
+            # whole job. `timeout` SIGKILLs a stuck fetcher (exit 124); we
+            # treat that like any other failure — graceful fallback, and the
+            # render still proceeds for every other source.
+            if timeout 360 Rscript "$f"; then
               echo "$name OK"
+              echo "| \`$name\` | ✅ ok |" >> "$GITHUB_STEP_SUMMARY"
             else
-              echo "::warning file=$f::Fetcher $name failed; page will fall back to last good snapshot"
+              code=$?
+              echo "::warning file=$f::Fetcher $name failed (exit $code); page falls back to last good snapshot"
+              echo "| \`$name\` | ⚠️ failed (exit $code) |" >> "$GITHUB_STEP_SUMMARY"
             fi
             echo "::endgroup::"
           done
           $any || echo "No R/fetch_*.R scripts yet — skipping fetch stage."
 
-      # Rebuild the cross-cutting derived datasets in data-final/ from the
-      # freshly-fetched data-apis/ snapshots + static data-manual/data-external
-      # inputs. Order is explicit because build_proposal_acts reads
-      # build_proposals_master's output (and alphabetical-glob order would
-      # be wrong: proposal_acts < proposals_master). Each script fails the
-      # workflow on error (unlike fetchers, which gracefully degrade) —
-      # a build failure means the derived parquet would mismatch its
-      # inputs and downstream pages would silently render from stale data.
+      # Persist the freshly-fetched (or restored last-good) snapshots back to
+      # the Actions cache so the next run starts from them. if: always() so a
+      # later render failure can't lose tonight's good fetch.
+      - name: Save refreshed data snapshots
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data-apis
+          key: data-apis-${{ github.run_id }}
+
+      # Rebuild only the derived datasets that LIVE pages consume:
+      # eu_member_states (eu-court, eu-law, eu-enlargement) and
+      # proposals_master (eu-law). Each fails the workflow on error (unlike
+      # fetchers, which gracefully degrade) because a derived parquet that
+      # mismatched its inputs would make a page render silently-wrong data.
+      # Deliberately NOT rebuilt nightly: build_eu_politics (its page is
+      # offline), build_proposal_acts (output is unconsumed), and
+      # build_data_external_parquets (a no-op in CI — its raw inputs are
+      # gitignored and absent on the runner). Run those locally on demand.
       - name: Rebuild data-final/
         shell: bash
         run: |
           for f in \
-              R/build_data_external_parquets.R \
               R/build_eu_member_states.R \
               R/build_proposals_master.R \
-              R/build_proposal_acts.R \
-              R/build_eu_politics.R \
           ; do
             name=$(basename "$f")
             echo "::group::$name"
