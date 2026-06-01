@@ -86,7 +86,11 @@ execute:
   # Suppress R warnings and messages from being baked into the rendered
   # HTML. Warnings still appear in stderr (visible in CI logs) so we
   # don't lose the signal; we just don't dump them onto the page where
-  # readers can see them. Errors still surface (failed chunk = visible
-  # error block, by Quarto default).
+  # readers can see them.
   warning: false
   message: false
+  # error: true so a single failing chunk renders an inline error block on
+  # that one page and the overall `quarto render` still exits 0 — one broken
+  # page (a missing snapshot, an upstream schema drift) can no longer block
+  # the deploy of the other, healthy pages. Page-level graceful degradation.
+  error: true
