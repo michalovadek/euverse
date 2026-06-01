@@ -63,6 +63,13 @@ $headings-font-weight: 700 !default;
   background: transparent;
 }
 
+// DataTables otherwise sit flush against whatever follows them. A little
+// breathing room below stops a table that runs straight into body text
+// (e.g. the Treaty-article table in eu-law) from reading as crammed.
+.cell-output-display > .dataTables_wrapper {
+  margin-bottom: 1.5rem;
+}
+
 // Tighter navbar — Quarto's default has more vertical air than we need.
 .navbar {
   padding-top: 0.25rem;
