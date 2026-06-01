@@ -63,11 +63,14 @@ $headings-font-weight: 700 !default;
   background: transparent;
 }
 
-// DataTables otherwise sit flush against whatever follows them. A little
-// breathing room below stops a table that runs straight into body text
-// (e.g. the Treaty-article table in eu-law) from reading as crammed.
-.cell-output-display > .dataTables_wrapper {
-  margin-bottom: 1.5rem;
+// DataTables sit flush against whatever follows them. DT renders as an
+// htmlwidget whose host div carries the `.datatables` class; the inner
+// `.dataTables_wrapper` is built by JS at runtime and is NOT a direct
+// child of .cell-output-display, so we target the host div. Without this
+// a table running straight into body text (e.g. the Treaty-article table
+// in eu-law) reads as crammed.
+.cell-output-display > .datatables {
+  margin-bottom: 2rem;
 }
 
 // Tighter navbar — Quarto's default has more vertical air than we need.
