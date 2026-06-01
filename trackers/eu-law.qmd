@@ -288,61 +288,6 @@ Decisions are by far the most numerous category. Directives are the
 rarest, reflecting their heavier political weight (a directive binds
 Member States as to result but lets them choose form and methods).
 
-## Outcomes
-
-Not every proposal makes it into the EU's legal corpus. Many are
-withdrawn before adoption, sometimes because of Council deadlock and
-sometimes because the Commission has decided to redraft.
-
-```{r prop-outcomes, echo=FALSE, fig.height=4, fig.width=9}
-outcomes <- props_master |>
-  filter(source_data == "euprops",  # outcome status only reliable for EUPROPS
-         !is.na(proposed),
-         proposal_type %in% c("Regulation", "Directive", "Decision")) |>
-  mutate(year = as.integer(format(proposed, "%Y")),
-         outcome = case_when(
-           !is.na(adopted)                 ~ "Adopted",
-           withdrawn == "withdrawn"        ~ "Withdrawn",
-           withdrawn == "rejected"         ~ "Rejected",
-           withdrawn == "replaced"         ~ "Replaced",
-           withdrawn == "not adopted"      ~ "Not adopted",
-           withdrawn == "repealed"         ~ "Repealed",
-           TRUE                            ~ "Other or pending"
-         )) |>
-  filter(year >= 1980, year <= year_now) |>
-  count(year, outcome) |>
-  group_by(year) |>
-  mutate(share = n / sum(n)) |>
-  ungroup() |>
-  mutate(outcome = factor(outcome,
-                          levels = c("Adopted", "Withdrawn", "Replaced",
-                                     "Rejected", "Not adopted", "Repealed",
-                                     "Other or pending")))
-
-p_outcomes <- ggplot(outcomes, aes(x = year, y = share, fill = outcome,
-                                   tooltip = paste0(outcome, ": ", n, " (", year, ")"),
-                                   data_id = paste0(outcome, year))) +
-  ggiraph::geom_col_interactive(show.legend = TRUE) +
-  scale_fill_manual(values = c(Adopted        = mo_palette$categorical[3],
-                               Withdrawn      = mo_palette$categorical[6],
-                               Replaced       = mo_palette$categorical[5],
-                               Rejected       = mo_palette$categorical[1],
-                               `Not adopted`  = mo_palette$categorical[7],
-                               Repealed       = mo_palette$categorical[2],
-                               `Other or pending` = mo_palette$categorical[8])) +
-  scale_y_continuous(labels = scales::percent, expand = c(0, 0)) +
-  scale_x_continuous(expand = c(0, 0)) +
-  labs(x = NULL, y = NULL, fill = NULL,
-       title = "Outcome of Commission proposals over time",
-       subtitle = "Share of proposals by status, EUPROPS-curated data (1980-2022)") +
-  theme_mo()
-
-girafe(ggobj = p_outcomes, width_svg = 9, height_svg = 4)
-```
-
-The vast majority of proposals end up adopted; withdrawal and rejection
-shares hover around the low single digits in most years.
-
 # Legislative efficiency
 
 The image of the EU as an unwieldy bureaucracy is widespread. Let's use
