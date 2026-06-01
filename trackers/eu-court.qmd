@@ -228,7 +228,7 @@ cases_master |>
 # Number of cases
 
 Even more than any other branch of the EU, the CJEU's caseload changed
-dramatically over the course of European integration. We can visualise
+dramatically over the course of European integration. We can visualize
 the annual caseload of the three EU courts since 1953.
 
 ```{r ncasesyearcourt, echo=FALSE, fig.height=8, fig.width=9}

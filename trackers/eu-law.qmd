@@ -61,7 +61,7 @@ n_decs <- sum(acts$type == "Decision")
 n_recs <- sum(acts$type == "Recommendation")
 ```
 
-The European Union is often criticised for having a heavy regulatory touch.
+The European Union is often criticized for having a heavy regulatory touch.
 What is the reality? This page provides an automatically updated overview
 of the EU's legislative output and efficiency, sourced from
 [Eur-Lex](https://eur-lex.europa.eu/) via the
@@ -123,7 +123,7 @@ girafe(ggobj = p_n_acts, width_svg = 9, height_svg = 5)
 # Proportion of act types
 
 Some types of acts, notably regulations, have been historically more common
-than others. We can visualise the evolution of proportions directly.
+than others. We can visualize the evolution of proportions directly.
 
 ```{r prop-time, echo=FALSE, fig.height=4, fig.width=9}
 proptime <- expand.grid(year = min(n_relevant$year):max(n_relevant$year),

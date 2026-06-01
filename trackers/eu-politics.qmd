@@ -76,7 +76,7 @@ freshness_badge_combined(list(ec_meta, em_meta))
 # Ideological composition of the Council
 
 The Council of the EU is composed of national governments; one seat
-per Member State, regardless of population. The chart below summarises
+per Member State, regardless of population. The chart below summarizes
 that body's centre of gravity over time by:
 
 1. Computing a **seat-weighted** ideological score for every cabinet
