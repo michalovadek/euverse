@@ -87,7 +87,7 @@ expect(grepl("callout-important", as.character(freshness_badge(unknown_age))), T
 old_meta <- list(source = "old", fetched_at = "2025-01-01T00:00:00Z", rows = 1)
 new_meta <- list(source = "new", fetched_at = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ", tz = "UTC"), rows = 2)
 combined_html <- as.character(freshness_badge_combined(list(new_meta, old_meta)))
-expect(grepl("old \\(oldest of 2 sources\\)", combined_html), TRUE, "combined picks oldest")
+expect(grepl("2025-01-01", combined_html), TRUE, "combined picks oldest date")
 
 # ---------------------------------------------------------------------------
 cat("All ", n_pass, " tests passed.\n", sep = "")

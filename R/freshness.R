@@ -43,14 +43,10 @@ freshness_badge <- function(meta) {
          else                  "callout-important"
 
   fetched_label <- if (is.na(age_h)) "unknown" else paste0(format(fetched, "%Y-%m-%d %H:%M"), " UTC")
-  source_label  <- if (is.null(meta$source) || !nzchar(as.character(meta$source))) "(source unknown)" else as.character(meta$source)
-  rows_label    <- if (is.null(meta$rows)) "?"
-                   else if (is.numeric(meta$rows)) format(meta$rows, big.mark = ",")
-                   else as.character(meta$rows)
 
   htmltools::HTML(sprintf(
-    '<div class="callout %s" style="margin:0 0 1em 0;padding:8px 12px;border-left:4px solid;border-radius:3px;">Data as of <strong>%s</strong> &middot; source: %s &middot; %s rows</div>',
-    cls, fetched_label, source_label, rows_label
+    '<div class="callout %s" style="margin:0 0 1em 0;padding:8px 12px;border-left:4px solid;border-radius:3px;">Data as of <strong>%s</strong></div>',
+    cls, fetched_label
   ))
 }
 
@@ -65,16 +61,10 @@ freshness_badge_combined <- function(metas) {
     if (length(t) == 1L && !is.na(t)) as.numeric(t) else NA_real_
   }, numeric(1))
   if (all(is.na(fetched_times))) {
-    return(freshness_badge(list(
-      source = "(multiple)", fetched_at = NA, rows = NA
-    )))
+    return(freshness_badge(list(fetched_at = NA)))
   }
   oldest_idx <- which.min(fetched_times)
-  oldest_meta <- metas[[oldest_idx]]
-  oldest_meta$source <- paste0(
-    oldest_meta$source, " (oldest of ", length(metas), " sources)"
-  )
-  freshness_badge(oldest_meta)
+  freshness_badge(metas[[oldest_idx]])
 }
 
 write_snapshot <- function(df, src,
