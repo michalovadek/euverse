@@ -9,6 +9,7 @@ suppressPackageStartupMessages({
   library(here)
   library(htmltools)
 })
+source(here::here("R", "freshness.R"))
 
 # Build one tracker card as a single un-indented HTML string. We use raw
 # sprintf rather than htmltools::div() because htmltools indents nested
@@ -74,5 +75,5 @@ positions in Sweden and Belgium and worked as a political advisor in the
 European Parliament.
 
 Cite individual trackers by their printed citation block; cite the project
-as a whole as: Ovádek, M. *euverse*. Accessed `r format(Sys.Date(), "%d %B %Y")`.
+as a whole as: Ovádek, M. *euverse*. Accessed `r fmt_date_nice(Sys.Date())`.
 Available at <https://michalovadek.github.io/euverse/>.

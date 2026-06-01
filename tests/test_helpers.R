@@ -90,4 +90,13 @@ combined_html <- as.character(freshness_badge_combined(list(new_meta, old_meta))
 expect(grepl("2025-01-01", combined_html), TRUE, "combined picks oldest date")
 
 # ---------------------------------------------------------------------------
+# freshness.R — date helpers (keep prose "as of" in sync with the badge)
+# ---------------------------------------------------------------------------
+expect(fmt_date_nice(as.Date("2026-06-01")),  "1 June 2026",      "fmt_date_nice strips leading zero")
+expect(fmt_date_nice(as.Date("2026-12-25")),  "25 December 2026", "fmt_date_nice two-digit day")
+expect(fmt_date_nice(as.Date(NA)),            "unknown",          "fmt_date_nice NA -> unknown")
+expect(as.character(freshness_date_combined(list(new_meta, old_meta))), "2025-01-01",
+       "freshness_date_combined picks oldest date")
+
+# ---------------------------------------------------------------------------
 cat("All ", n_pass, " tests passed.\n", sep = "")

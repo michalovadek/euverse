@@ -182,7 +182,7 @@ a reasonable approximation of the true state of the world. The
 [IUROPA](https://iuropa.pol.gu.se/) project is attempting to create
 more comprehensive datasets.]
 
-As of `r format(today_d, "%d %B %Y")`, EU courts have delivered
+As of `r fmt_date_nice(freshness_date_combined(list(elc$meta, ed$meta)))`, EU courts have delivered
 `r mono(fmt_n(n_decisions))` decisions in about
 `r mono(fmt_n(n_cases))` cases submitted to them since 1953.
 According to public records, `r mono(fmt_n(n_pending_cj))` cases are
@@ -658,5 +658,5 @@ still pending.
 # Cite
 
 Ovádek, M. *euverse: Judicial Proceedings in the European Union*. Accessed
-`r format(Sys.Date(), "%d %B %Y")`. Available at
+`r fmt_date_nice(Sys.Date())`. Available at
 <https://michalovadek.github.io/euverse/trackers/eu-court.html>.

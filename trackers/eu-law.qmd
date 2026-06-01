@@ -68,7 +68,7 @@ of the EU's legislative output and efficiency, sourced from
 [eurlex](https://github.com/michalovadek/eurlex) R package.^[Any omissions
 or mistakes in Eur-Lex carry through to the output shown here.]
 
-As of `r format(today_d, "%d %B %Y")`, the EU and its predecessors have
+As of `r fmt_date_nice(freshness_date_combined(list(acts_meta$meta, force_meta$meta, proposals_meta$meta, lbs_meta$meta)))`, the EU and its predecessors have
 produced `r mono(fmt_n(n_regs))` regulations,
 `r mono(fmt_n(n_dirs))` directives,
 `r mono(fmt_n(n_decs))` decisions and
@@ -485,5 +485,5 @@ based on another piece of legislation rather than directly on a Treaty.
 # Cite
 
 Ovádek, M. *euverse: Legislative Output of the European Union*. Accessed
-`r format(Sys.Date(), "%d %B %Y")`. Available at
+`r fmt_date_nice(Sys.Date())`. Available at
 <https://michalovadek.github.io/euverse/trackers/eu-law.html>.

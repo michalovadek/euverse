@@ -50,21 +50,41 @@ freshness_badge <- function(meta) {
   ))
 }
 
-freshness_badge_combined <- function(metas) {
-  # Render one badge for a multi-source page based on the OLDEST fetched_at
-  # in the input list. Users see worst-case staleness rather than best-case
-  # — the honest answer when a page joins data from several sources.
+oldest_meta <- function(metas) {
+  # The single meta with the OLDEST fetched_at — worst-case staleness, the
+  # honest signal when a page joins data from several sources. Falls back to
+  # an NA-dated stub when no input carries a parseable timestamp.
   fetched_times <- vapply(metas, function(m) {
     t <- suppressWarnings(
       as.POSIXct(m$fetched_at, tz = "UTC", format = "%Y-%m-%dT%H:%M:%SZ")
     )
     if (length(t) == 1L && !is.na(t)) as.numeric(t) else NA_real_
   }, numeric(1))
-  if (all(is.na(fetched_times))) {
-    return(freshness_badge(list(fetched_at = NA)))
-  }
-  oldest_idx <- which.min(fetched_times)
-  freshness_badge(metas[[oldest_idx]])
+  if (all(is.na(fetched_times))) return(list(fetched_at = NA))
+  metas[[which.min(fetched_times)]]
+}
+
+# Render one badge for a multi-source page based on the oldest fetched_at.
+freshness_badge_combined <- function(metas) freshness_badge(oldest_meta(metas))
+
+# Date helpers — let a page's prose "as of <date>" track the same date the
+# badge shows, instead of drifting to the render date.
+freshness_date <- function(meta) {
+  # Calendar date (UTC) the badge reports for a single source; NA if unknown.
+  t <- suppressWarnings(
+    as.POSIXct(meta$fetched_at, tz = "UTC", format = "%Y-%m-%dT%H:%M:%SZ")
+  )
+  if (length(t) != 1L || is.na(t)) return(as.Date(NA))
+  as.Date(t, tz = "UTC")
+}
+
+freshness_date_combined <- function(metas) freshness_date(oldest_meta(metas))
+
+fmt_date_nice <- function(d) {
+  # Human date with no leading zero on the day: "1 June 2026".
+  d <- as.Date(d)
+  if (length(d) != 1L || is.na(d)) return("unknown")
+  paste(as.integer(format(d, "%d")), format(d, "%B %Y"))
 }
 
 write_snapshot <- function(df, src,

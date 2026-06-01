@@ -242,5 +242,5 @@ candidates |>
 # Cite
 
 Ovádek, M. *euverse: Enlargement of the European Union*. Accessed
-`r format(Sys.Date(), "%d %B %Y")`. Available at
+`r fmt_date_nice(Sys.Date())`. Available at
 <https://michalovadek.github.io/euverse/trackers/eu-enlargement.html>.

@@ -46,7 +46,7 @@ veto_meta <- list(
 )
 
 # Inline-prose stats.
-start_date <- format(min(as.Date(veto_data$date_veto)), "%d %B %Y")
+start_date <- fmt_date_nice(min(as.Date(veto_data$date_veto)))
 n_vetoes   <- nrow(veto_data)
 n_states   <- length(unique(veto_data$ms_veto))
 n_issues   <- max(veto_data$id_issue)
@@ -226,5 +226,5 @@ girafe(ggobj = p_c, width_svg = 9, height_svg = 5)
 # Cite
 
 Ovádek, M. *euverse: Tracking EU Member States' Vetoes*. Accessed
-`r format(Sys.Date(), "%d %B %Y")`. Available at
+`r fmt_date_nice(Sys.Date())`. Available at
 <https://michalovadek.github.io/euverse/trackers/eu-vetoes.html>.
