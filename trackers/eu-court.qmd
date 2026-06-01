@@ -275,7 +275,7 @@ girafe(ggobj = p_caseload, width_svg = 9, height_svg = 8)
 ```
 
 The increase in the CJ's and GC's caseloads was mostly gradual.
-Interestingly, the outsourcing of the civil service agenda to the CST
+The outsourcing of the civil service agenda to the CST
 did not prevent the GC's caseload from rising during its period of
 operation.
 

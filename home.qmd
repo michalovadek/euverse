@@ -29,21 +29,20 @@ card <- function(href, title, blurb) {
 The European Union generates an extraordinary amount of public data:
 court rulings, vetoes, legal acts, financial indicators. Most of it lives
 behind unfriendly APIs and PDF archives. This site pulls those streams
-into plain-language dashboards that re-render every night, so the chart
-you see is the chart the data supports today.
+into plain-language dashboards that re-render every night.
 
 ::: {.tracker-grid}
 
 ```{r cards, echo=FALSE, results='asis'}
 cat(
   card("trackers/eu-finance.html", "EU Finance",
-       "Bond yields, inflation, and the ECB's key rate, plotted against the post-2008 sovereign-debt back-history."),
+       "Bond yields, inflation and the ECB's key rate, plotted against the post-2008 sovereign-debt back-history."),
   card("trackers/eu-vetoes.html", "EU Vetoes",
        "Every Member State veto on a Council file since 2010, hand-curated from the public record."),
   card("trackers/eu-court.html", "EU Court",
-       "Caseload, procedure types, rapporteur productivity, and country-of-origin maps for the CJEU."),
+       "Caseload, procedure types, rapporteur productivity and country-of-origin maps for the CJEU."),
   card("trackers/eu-law.html", "EU Law",
-       "Regulations, directives, decisions, and recommendations adopted by the EU since 1952, plus how long they took to pass."),
+       "Regulations, directives, decisions and recommendations adopted by the EU since 1952, plus how long they took to pass."),
   card("trackers/eu-enlargement.html", "EU Enlargement",
        "Membership of the EU from the Founding Six in 1957 to today, traced wave by wave (and the one withdrawal)."),
   sep = "\n"
@@ -70,7 +69,7 @@ The full source is on
 I'm [Michal Ovádek](https://michalovadek.github.io/), a Lecturer in
 European Institutions, Politics and Policy at UCL's Department of
 Political Science. My research focuses on European integration, judicial
-politics, and Central and Eastern Europe. Before UCL I held research
+politics and Central and Eastern Europe. Before UCL I held research
 positions in Sweden and Belgium and worked as a political advisor in the
 European Parliament.
 

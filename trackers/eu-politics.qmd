@@ -61,7 +61,7 @@ Council of the European Union as a whole.
 Two complementary sources sit underneath:
 
 - **[ParlGov](https://www.parlgov.org/)** for the factual record of
-  which parties were in cabinet in each Member State, when, and with
+  which parties were in cabinet in each Member State, when and with
   what share of seats. ParlGov also assigns each party a fixed
   left-right score and a pro/anti-EU score (`eu_anti_pro`, 0 = anti-EU,
   10 = pro-EU) drawn from expert surveys.
@@ -88,7 +88,7 @@ that body's centre of gravity over time by:
 Caveats up front: this is "average national government", not a
 Council-formation-specific view (we'd need minister-portfolio-party
 data, which ParlGov doesn't provide), and ParlGov's `eu_anti_pro` field
-is missing entirely for parties in **Luxembourg, Cyprus, and Malta**,
+is missing entirely for parties in **Luxembourg, Cyprus and Malta**,
 so those three countries drop out of the EU-stance average (the
 left-right average covers all 27/28).
 
@@ -136,12 +136,12 @@ girafe(ggobj = p_council, width_svg = 9, height_svg = 5)
 
 Two long-run movements show up clearly. On left-right the Council
 drifted leftward in the late 1990s (the era of Blair, Schröder,
-Jospin), drifted back to centre-right by the mid-2000s, and has been
+Jospin), drifted back to centre-right by the mid-2000s and has been
 trending centre-right ever since, particularly post-2022. On the
 EU-stance dimension the Council peaked at ≈ 8/10 in the late 1990s
 and the early-2000s "Big Bang" enlargement years; it has slowly drifted
 to ≈ 7.4/10 today as eurosceptic governments entered cabinet in Italy,
-Slovakia, and elsewhere.
+Slovakia and elsewhere.
 
 # By-country breakdown
 
@@ -184,7 +184,7 @@ p_heat <- ggplot(eg_plot,
        title = "Cabinet EU stance, Member State by year",
        subtitle = "Each cell: one MS in one year, coloured by ParlGov eu_anti_pro of cabinet parties",
        fill = NULL,
-       caption = paste0("Grey cells = pre-accession, post-Brexit, or no ParlGov ",
+       caption = paste0("Grey cells = pre-accession, post-Brexit or no ParlGov ",
                         "eu_anti_pro (Luxembourg, Cyprus, Malta).")) +
   theme_mo() +
   theme(legend.position    = "bottom",
@@ -202,7 +202,7 @@ shifts: Fidesz, for instance, keeps its pre-Orbán "moderately pro-EU"
 score throughout, even though Hungary's actual EU stance from 2010
 onward is sharply different. With that caveat, the most strikingly
 eurosceptic governments since 1990 include Italy's Conte-I in 2018-19,
-the post-2022 Meloni cabinet, and several Bulgarian and Czech
+the post-2022 Meloni cabinet and several Bulgarian and Czech
 coalitions.
 
 # Salience of "Europe" in election manifestos
@@ -249,7 +249,7 @@ girafe(ggobj = p_man, width_svg = 9, height_svg = 4.5)
 ```
 
 Pro-EU framing rose steadily through the Maastricht / single-market
-era, peaked in the late 1990s, and has since drifted down as openly
+era, peaked in the late 1990s and has since drifted down as openly
 euro-critical campaigning has spread across the continent. What's
 measured is _attention_, not endorsement; the rise in negative coverage
 after 2010 reflects both genuinely eurosceptic parties and pro-EU

@@ -71,7 +71,7 @@ or mistakes in Eur-Lex carry through to the output shown here.]
 As of `r format(today_d, "%d %B %Y")`, the EU and its predecessors have
 produced `r mono(fmt_n(n_regs))` regulations,
 `r mono(fmt_n(n_dirs))` directives,
-`r mono(fmt_n(n_decs))` decisions, and
+`r mono(fmt_n(n_decs))` decisions and
 `r mono(fmt_n(n_recs))` recommendations.
 
 ```{r freshness, results='asis', echo=FALSE}
@@ -251,7 +251,7 @@ post-2022 tail. Total proposals in scope: `r mono(fmt_n(nrow(props_master)))`,
 of which `r mono(fmt_n(sum(!is.na(props_master$adopted))))` led to at
 least one adopted act and
 `r mono(fmt_n(sum(props_master$withdrawn %in% c('withdrawn', 'rejected', 'not adopted', 'replaced'))))`
-were withdrawn, rejected, replaced, or never adopted.
+were withdrawn, rejected, replaced or never adopted.
 
 Note: EUPROPS coverage of *recommendations* is very thin (fewer than
 30 records across its 70-year span), so EUPROPS-driven charts on this
