@@ -40,5 +40,10 @@ if (!all(c("date", "rate_pct") %in% names(df))) {
   quit(status = 1L)
 }
 
+if (all(is.na(df$rate_pct))) {
+  message("Validation failed: all rate values are NA (empty or embargoed response)")
+  quit(status = 1L)
+}
+
 # ---- 3. write atomically ----------------------------------------------------
 write_snapshot(df, src)

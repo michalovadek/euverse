@@ -41,5 +41,10 @@ if (!all(c("date", "yoy_pct") %in% names(df))) {
   quit(status = 1L)
 }
 
+if (all(is.na(df$yoy_pct))) {
+  message("Validation failed: all inflation values are NA (empty or embargoed response)")
+  quit(status = 1L)
+}
+
 # ---- 3. write atomically ----------------------------------------------------
 write_snapshot(df, src)

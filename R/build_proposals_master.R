@@ -36,6 +36,17 @@ parse_d <- function(x) suppressWarnings(as.Date(x))
 euprops_raw <- arrow::read_parquet(
   here::here("data-external", "euprops", "euprops_v2_0.parquet")
 )
+# Fail with a legible, attributable message if the external EUPROPS mirror's
+# schema drifts: a renamed/dropped column would otherwise crash mid-pipe with
+# a cryptic dplyr error and block the whole site deploy.
+.needed_cols <- c("proposed", "adopted", "myerror", "type", "sourceid", "source",
+                  "amending", "EUPROPID", "withdrawn", "title", "legalbase",
+                  "adoptedlb", "firstlaw", "adoptedlaws")
+.missing_cols <- setdiff(.needed_cols, names(euprops_raw))
+if (length(.missing_cols)) {
+  stop("EUPROPS input is missing columns: ", paste(.missing_cols, collapse = ", "),
+       " — has data-external/euprops/euprops_v2_0.parquet schema changed?")
+}
 n_raw <- nrow(euprops_raw)
 
 # ---- 2. Sanity filters ------------------------------------------------------
@@ -122,7 +133,10 @@ euprops_clean <- euprops |>
   )
 
 # ---- 6. Append Eur-Lex tail for proposals after EUPROPS cutoff --------------
-euprops_cutoff <- max(euprops_clean$proposed, na.rm = TRUE)
+# Clamp to today: a typo'd far-future `proposed` date in the hand-curated
+# EUPROPS file must not push the cutoff past now and silently swallow the
+# entire Eur-Lex tail.
+euprops_cutoff <- min(max(euprops_clean$proposed, na.rm = TRUE), Sys.Date())
 
 celex_type_letter <- function(celex) str_sub(celex, 6, 7)
 celex_source_org <- function(celex) {

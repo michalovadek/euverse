@@ -87,6 +87,23 @@ fmt_date_nice <- function(d) {
   paste(as.integer(format(d, "%d")), format(d, "%B %Y"))
 }
 
+check_rowcount <- function(n, src, dir = here::here("data-apis"),
+                           min_rows = 1L, max_drop = 0.4) {
+  # Gate a fresh row count against an absolute floor AND the previous
+  # snapshot's row count, so a clean-but-partial upstream response can't
+  # silently replace a full snapshot with a much smaller one. Returns TRUE
+  # only if it clears both. With no previous snapshot, only the floor applies.
+  if (!is.numeric(n) || length(n) != 1L || is.na(n) || n < min_rows) return(FALSE)
+  meta_path <- file.path(dir, paste0(src, "_latest.meta.json"))
+  if (file.exists(meta_path)) {
+    prev <- tryCatch(jsonlite::fromJSON(meta_path)$rows,
+                     error = function(e) NA_real_)
+    if (is.numeric(prev) && length(prev) == 1L && !is.na(prev) &&
+        prev > 0 && n < prev * (1 - max_drop)) return(FALSE)
+  }
+  TRUE
+}
+
 write_snapshot <- function(df, src,
                            out_dir = here::here("data-apis")) {
   # Atomic counterpart to read_with_freshness(). Every R/fetch_*.R ends with

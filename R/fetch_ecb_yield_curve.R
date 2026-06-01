@@ -53,5 +53,10 @@ if (!all(df$maturity_years %in% c(1L, 5L, 10L))) {
   quit(status = 1L)
 }
 
+if (all(is.na(df$yield_pct))) {
+  message("Validation failed: all yield values are NA (empty or embargoed response)")
+  quit(status = 1L)
+}
+
 # ---- 3. write atomically ----------------------------------------------------
 write_snapshot(df, src)

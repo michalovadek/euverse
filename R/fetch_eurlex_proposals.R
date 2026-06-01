@@ -21,8 +21,8 @@ df <- tryCatch({
   quit(status = 1L)
 })
 
-if (!is.data.frame(df) || nrow(df) < 5000L) {
-  message("Validation failed: too few rows (", nrow(df), ")")
+if (!is.data.frame(df) || !check_rowcount(nrow(df), src, min_rows = 5000L)) {
+  message("Validation failed: ", nrow(df), " rows (below floor or >40% drop vs last snapshot)")
   quit(status = 1L)
 }
 if (!all(c("celex", "date_proposal") %in% names(df))) {

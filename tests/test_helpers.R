@@ -99,4 +99,13 @@ expect(as.character(freshness_date_combined(list(new_meta, old_meta))), "2025-01
        "freshness_date_combined picks oldest date")
 
 # ---------------------------------------------------------------------------
+# freshness.R — check_rowcount (absolute floor + relative-drop guard).
+# The `smoke` snapshot written above has rows = 3 in tempdir `td`.
+# ---------------------------------------------------------------------------
+expect(check_rowcount(100, "absent", dir = td, min_rows = 50), TRUE,  "rowcount: above floor, no prev")
+expect(check_rowcount(10,  "absent", dir = td, min_rows = 50), FALSE, "rowcount: below absolute floor")
+expect(check_rowcount(3,   "smoke",  dir = td, min_rows = 0),  TRUE,  "rowcount: equals prev is ok")
+expect(check_rowcount(1,   "smoke",  dir = td, min_rows = 0, max_drop = 0.4), FALSE, "rowcount: >40% drop vs prev")
+
+# ---------------------------------------------------------------------------
 cat("All ", n_pass, " tests passed.\n", sep = "")
