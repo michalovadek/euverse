@@ -257,6 +257,6 @@ parties responding to them.
 
 # Cite
 
-Ovádek, M. *Politics of EU Member State Governments*. Accessed
+Ovádek, M. *euverse: Politics of EU Member State Governments*. Accessed
 `r format(today_d, "%d %B %Y")`. Available at
 <https://michalovadek.github.io/euverse/trackers/eu-politics.html>.

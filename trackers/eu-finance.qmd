@@ -236,4 +236,4 @@ to raise key interest rates.
 
 # Cite
 
-Ovádek, M. *Borrowing and Yields in the European Union*. Accessed `r format(today_d, "%d %B %Y")`. Available at <https://michalovadek.github.io/euverse/trackers/eu-finance.html>.
+Ovádek, M. *euverse: Borrowing and Yields in the European Union*. Accessed `r format(today_d, "%d %B %Y")`. Available at <https://michalovadek.github.io/euverse/trackers/eu-finance.html>.

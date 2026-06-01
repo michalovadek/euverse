@@ -657,6 +657,6 @@ still pending.
 
 # Cite
 
-Ovádek, M. *Judicial Proceedings in the European Union*. Accessed
+Ovádek, M. *euverse: Judicial Proceedings in the European Union*. Accessed
 `r format(Sys.Date(), "%d %B %Y")`. Available at
 <https://michalovadek.github.io/euverse/trackers/eu-court.html>.

@@ -533,6 +533,6 @@ based on another piece of legislation rather than directly on a Treaty.
 
 # Cite
 
-Ovádek, M. *Legislative Output of the European Union*. Accessed
+Ovádek, M. *euverse: Legislative Output of the European Union*. Accessed
 `r format(Sys.Date(), "%d %B %Y")`. Available at
 <https://michalovadek.github.io/euverse/trackers/eu-law.html>.

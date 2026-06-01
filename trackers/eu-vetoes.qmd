@@ -225,6 +225,6 @@ girafe(ggobj = p_c, width_svg = 9, height_svg = 5)
 
 # Cite
 
-Ovádek, M. *Tracking EU Member States' Vetoes*. Accessed
+Ovádek, M. *euverse: Tracking EU Member States' Vetoes*. Accessed
 `r format(Sys.Date(), "%d %B %Y")`. Available at
 <https://michalovadek.github.io/euverse/trackers/eu-vetoes.html>.
