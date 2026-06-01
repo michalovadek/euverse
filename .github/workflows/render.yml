@@ -31,11 +31,11 @@ concurrency:
   group: pages-render
   cancel-in-progress: false
 
-# Run all JavaScript actions on Node 24 now, ahead of GitHub's 2026-06-16
-# forced migration (Node 20 is removed from runners 2026-09-16). The actions
-# below use floating major tags that pick up Node 24 builds automatically;
-# this opts in early so we validate the runtime on our own schedule, and it
-# becomes a harmless no-op once Node 24 is the runner default.
+# The directly-pinned actions below are now Node-24 majors, but
+# upload-pages-artifact still vendors a Node-20 actions/upload-artifact
+# internally. Force that (and any future transitive Node-20 action) onto
+# Node 24 now, ahead of GitHub's 2026-06-16 forced migration / 2026-09-16
+# Node 20 removal. Harmless no-op once Node 24 is the runner default.
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
@@ -58,7 +58,7 @@ jobs:
       # then revert the pin once the cache catches up. Tag lists:
       #   https://github.com/r-lib/actions/tags
       #   https://github.com/quarto-dev/quarto-actions/tags
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Restore the last-good data snapshots from the Actions cache (which
       # lives OUTSIDE the repo, so this adds no git history and the repo never
@@ -68,7 +68,7 @@ jobs:
       # last committed. The committed data-apis/ snapshots remain only as a
       # cold-start bootstrap for the first run / after cache eviction.
       - name: Restore last-good data snapshots
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: data-apis
           key: data-apis-${{ github.run_id }}
@@ -100,7 +100,7 @@ jobs:
         uses: r-lib/actions/setup-renv@v2
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v7
         with:
           version: '0.10.7'
           enable-cache: true
@@ -165,7 +165,7 @@ jobs:
       # later render failure can't lose tonight's good fetch.
       - name: Save refreshed data snapshots
         if: always()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: data-apis
           key: data-apis-${{ github.run_id }}
@@ -216,7 +216,7 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
 
   # ----------------------------------------------------------------------------
   # VERIFY — fetch the live site after deploy and confirm each tracker URL
