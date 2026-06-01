@@ -158,15 +158,34 @@ typical tracker data and avoids the >50 MB warnings.
     standalone trackers did, that races with Eurostat's update and yields
     stale numbers); plus `push` to `main` for layout/code changes
     (docs-only paths skipped); plus `workflow_dispatch` for manual reruns.
-  - Pipeline: `setup-r@v2 (4.4.3)` → `setup-renv@v2` (cached on hash of
-    renv.lock) → `setup-uv@v5 (0.10.7, cached)` → `uv sync --frozen
-    --no-install-project` → `setup-quarto@v2 (1.7.17)` → run every
-    `R/fetch_*.R` with graceful failure → `quarto render` →
-    `upload-pages-artifact@v3` → `deploy-pages@v4` (currently inert).
-  - **Graceful degradation is enforced in the workflow itself** (not in
-    R): each fetcher runs in its own `Rscript` invocation; a non-zero
-    exit emits a GitHub Actions `::warning::` annotation but does NOT
-    fail the job.
+  - Pipeline: `checkout` → **restore `data-apis/` from the Actions cache**
+    (last-good fallback, see below) → `setup-r@v2 (4.4.3)` →
+    `setup-renv@v2` (cached on hash of renv.lock) → `setup-uv@v5 (0.10.7,
+    cached)` → `uv sync --frozen --no-install-project` →
+    `setup-quarto@v2 (1.7.17)` → `tests/test_helpers.R` → run every
+    `R/fetch_*.R` under `timeout 360` with graceful failure, writing a
+    per-source ok/failed digest to the run summary → **save `data-apis/`
+    back to the cache** → rebuild only the derived datasets LIVE pages use
+    (`build_eu_member_states.R`, `build_proposals_master.R`; the others —
+    `build_eu_politics` (page offline), `build_proposal_acts` (unused),
+    `build_data_external_parquets` (CI no-op) — are run locally on demand,
+    not nightly) → `quarto render` → `upload-pages-artifact@v3` →
+    `deploy-pages@v4` (active) → `verify` job (every sitemap URL → 200).
+    Job budget: 45 min.
+  - **Graceful degradation, on three levels:** (1) each fetcher runs in its
+    own `timeout 360 Rscript` invocation; a non-zero exit or timeout emits a
+    `::warning::` plus a digest row but does NOT fail the job. (2) The
+    last-good `data-apis/` snapshots persist in the **Actions cache**
+    (restored at job start, saved after fetch), so a fetcher that fails for
+    a stretch falls back to the last *successful* fetch, not to the last
+    committed seed. The committed snapshots are only a cold-start bootstrap;
+    the cache lives outside the repo, so this self-healing fallback adds no
+    git growth. (3) `error: true` in `_quarto.yml` renders a failing chunk
+    as an inline error block instead of aborting the whole render, so one
+    broken page can't block the deploy of the others. Fetchers also reject a
+    fetch that drops >40% vs the previous snapshot (`check_rowcount` in
+    `R/freshness.R`) or returns an all-NA value column, so a clean-but-
+    partial upstream response can't silently overwrite good data.
   - System libs for compiled R packages are installed via an explicit
     `apt-get install` step **before** `setup-renv`. Each entry maps to a
     package in `renv.lock` (libpoppler-cpp-dev=pdftools, libqpdf-dev=qpdf,
