@@ -263,12 +263,31 @@ jobs:
           echo "::notice::Probing $n URLs from sitemap"
           fail=0
           while read -r url; do
-            status=$(curl -sSL -o /dev/null -w "%{http_code}" "$url" || true)
-            if [ "$status" = "200" ]; then
-              echo "::notice::OK $status $url"
-            else
+            body=$(curl -sSL --max-time 30 -w $'\n%{http_code}' "$url" || true)
+            status=$(printf '%s' "$body" | tail -n1)
+            if [ "$status" != "200" ]; then
               echo "::error::$url returned $status"
               fail=1
+              continue
             fi
+            # Tracker pages must show their "Data as of" badge. Its absence on
+            # a 200 means the data-load chunk errored: with error: true a
+            # failed chunk renders an inline error block and the page still
+            # returns 200, so a status-only check would miss a broken page. A
+            # graceful fallback to an older snapshot still renders the badge,
+            # so this fires only on a genuinely broken render, not on stale data.
+            case "$url" in
+              */trackers/*)
+                if printf '%s' "$body" | grep -q "Data as of"; then
+                  echo "::notice::OK $status (badge present) $url"
+                else
+                  echo "::error::$url is 200 but missing the 'Data as of' badge — likely a rendered error block"
+                  fail=1
+                fi
+                ;;
+              *)
+                echo "::notice::OK $status $url"
+                ;;
+            esac
           done < urls.txt
           exit "$fail"
