@@ -97,7 +97,7 @@ ggplot(ms_long_wave, aes(x = year, y = n_ms, fill = wave)) +
   geom_area(colour = "white", linewidth = 0.15) +
   scale_fill_manual(values = mo_palette$categorical) +
   scale_x_continuous(expand = c(0, 0), breaks = seq(1950, year_now, 10)) +
-  scale_y_continuous(expand = c(0, 0), breaks = c(6, 9, 12, 15, 27, 28),
+  scale_y_continuous(expand = c(0, 0), breaks = c(6, 9, 12, 15, 27),
                      limits = c(0, 30)) +
   labs(x = NULL, y = NULL,
        title = "EU membership over time",
@@ -136,7 +136,7 @@ p_timeline <- ggplot(ms_timeline,
   scale_colour_manual(values = mo_palette$categorical) +
   scale_x_continuous(breaks = seq(1950, year_now, 10), expand = c(0.02, 0.02)) +
   labs(x = NULL, y = NULL,
-       title = "When each Member State joined (and, for the UK, left)",
+       title = "When each Member State joined and, for the UK, left",
        subtitle = "Each bar runs from the accession year to today; UK's bar ends in 2020",
        colour = NULL) +
   theme_mo() +
