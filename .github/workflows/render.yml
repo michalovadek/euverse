@@ -31,6 +31,14 @@ concurrency:
   group: pages-render
   cancel-in-progress: false
 
+# Run all JavaScript actions on Node 24 now, ahead of GitHub's 2026-06-16
+# forced migration (Node 20 is removed from runners 2026-09-16). The actions
+# below use floating major tags that pick up Node 24 builds automatically;
+# this opts in early so we validate the runtime on our own schedule, and it
+# becomes a harmless no-op once Node 24 is the runner default.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   render:
     runs-on: ubuntu-latest
